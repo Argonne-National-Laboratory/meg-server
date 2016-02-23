@@ -3,32 +3,18 @@ from urllib.parse import urlencode
 from flask import Blueprint, request
 import requests
 
-from meg.pgp import store_revocation_cert as backend_cert_storage
+from meg.pgp import store_revocation_cert as backend_cert_storage, verify_trust_level
+from meg.skier import make_get_request, make_skier_request
 
 
-def getkey_or_search(cfg, api, arg):
-    urn = "{}/{}".format(server_url,  api, arg)
-    return make_skier_request(cfg, requests.get, urn)
-
-
-def make_skier_request(cfg, func, urn):
-    """
-    Get skier specific info. Just act as a thin proxy.
-    """
-    keyservers = cfg.config.keyservers
-    for server_url in keyservers:
-        r = func("{}/api/v1/{}".format(server_url, urn))
-        if r.status_code != 200:
-            continue
-        return r.content, 200
-    else:
-        return r.content, r.status_code
-
-
-def create_routes(app, db, cfg, RevocationKey):
+def create_routes(app, db, cfg, RevocationKey, Signature):
+    # XXX I don't actually know if we need this API
+    #
+    # But now that I think more on it we probably will in
+    # case we want to sign keys. But let's worry about this later
     @app.route("/getkey/<keyid>", methods=["GET"])
     def getkey(keyid):
-        return getkey_or_search(cfg, "getkey", keyid)
+        return make_get_request(cfg, "getkey", keyid)
 
 
     @app.route("/store_revocation_cert", methods=["PUT"])
@@ -43,20 +29,23 @@ def create_routes(app, db, cfg, RevocationKey):
         return "Success", 200
 
 
-    @app.route("/revoke_certificate", methods=["POST"])
-    def revoke_certificate():
+    @app.route("/revoke_certificate/<keyid>", methods=["POST"])
+    def revoke_certificate(keyid):
         """
         Revoke a users public key certificate
         """
+        # XXX This method is really just a stub
         armored_key = get_revocation_cert()
         return make_skier_request(
             cfg, requests.post, "addkey?{}".format(urlencode({"keydata": armored_key}))
         )
 
-
+    # XXX Search is pretty weak right now on Skier. We might not be able
+    # to find keys by email address which is a pretty big deal for us.
+    # So lets look into this eventually and figure it out.
     @app.route("/search/<search_str>", methods=["GET"])
     def search(search_str):
-        return getkey_or_search(cfg, "search", search_str)
+        return make_get_request(cfg, "search", search_str)
 
 
     @app.route("/get_trust_level/<origin_keyid>/<contact_keyid>", methods=["GET"])
@@ -68,4 +57,5 @@ def create_routes(app, db, cfg, RevocationKey):
         1: can be verified through web of trust
         2: untrusted
         """
-        pass
+        # XXX TODO Error checking
+        return str(verify_trust_level(cfg, Signature, origin_keyid, contact_keyid)), 200

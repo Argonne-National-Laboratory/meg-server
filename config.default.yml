@@ -7,3 +7,5 @@ db:
 
 keyservers:
   - http://localhost:8080
+
+wot_bfs_max_depth: 5
