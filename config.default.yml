@@ -6,4 +6,4 @@ db:
   database: meg
 
 keyservers:
-  - localhost
+  - http://localhost:8080
