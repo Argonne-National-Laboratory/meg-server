@@ -14,7 +14,7 @@ def create_app(testing=False, debug=False):
     app = Flask(__name__)
     cfg = configure_app(app, testing, debug)
     db = meg.db.create_db(app)
-    RevocationKey, Signature = meg.db.generate_models(db)
+    RevocationKey = meg.db.generate_models(db)
     db.create_all()
-    create_routes(app, db, cfg, RevocationKey, Signature)
+    create_routes(app, db, cfg, RevocationKey)
     return app

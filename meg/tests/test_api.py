@@ -28,7 +28,7 @@ class TestMEGAPI(TestCase):
         app = Flask(__name__)
         cfg = configure_app(app, testing=True, debug=True)
         self.db = create_db(app)
-        r, _ = generate_models(self.db)
+        r = generate_models(self.db)
         create_routes(app, self.db, cfg, r)
         return app
 

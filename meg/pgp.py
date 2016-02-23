@@ -25,18 +25,17 @@ def store_revocation_cert(db, armored_key, RevocationKey):
     if not isinstance(signature, SignaturePacket):
         raise Exception("No signature packet found")
 
-    keyalgo = signature.hash_algorithm
     created = signature.creation_time
     expires = signature.expiration_time
     length = signature.length
-    key_id = signature.key_id
+    key_id = signature.key_id.decode()[-8:]  # We just need the last 8 chars
 
-    revocation_key = RevocationKey(keyalgo, created, expires, length, armored_key, key_id)
+    revocation_key = RevocationKey(created, expires, length, armored_key, key_id)
     db.session.add(revocation_key)
     db.session.commit()
 
 
-def verify_trust_level(cfg, Signature, origin_keyid, contact_keyid):
+def verify_trust_level(cfg, origin_keyid, contact_keyid):
     """
     Helper method for the API level task.
 
@@ -44,25 +43,24 @@ def verify_trust_level(cfg, Signature, origin_keyid, contact_keyid):
     1 if can be validated through web of trust
     2 if we cannot trust contact
     """
-    if determine_if_implicitly_trusted(Signature, origin_keyid, contact_keyid):
+    if determine_if_implicitly_trusted(origin_keyid, contact_keyid):
         return 0
-    elif determine_through_web_of_trust(cfg, Signature, origin_keyid, contact_keyid):
+    elif determine_through_web_of_trust(cfg, origin_keyid, contact_keyid):
         return 1
     else:
         return 2
 
 
-def determine_if_implicitly_trusted(Signature, origin_keyid, contact_keyid):
+def determine_if_implicitly_trusted(origin_keyid, contact_keyid):
     """
     Determine if we directly trust the contact
     """
-    results = Signature.query.filter(
-        and_(Signature.pgp_keyid == origin_keyid, Signature.key_sfp_for == contact_keyid)
-    )
+    results = make_get_request("keyinfo", origin_keyid)
+    # XXX TODO
     return True if results.first() else False
 
 
-def determine_through_web_of_trust(cfg, Signature, origin_keyid, contact_keyid):
+def determine_through_web_of_trust(cfg, origin_keyid, contact_keyid):
     """
     Find out if our contact is trusted through our web of trust
 
@@ -73,8 +71,15 @@ def determine_through_web_of_trust(cfg, Signature, origin_keyid, contact_keyid):
     def recursive_search(keyids, cur_depth):
         next_search = []
         for key in keyids:
-            results = Signature.query.filter(Signature.pgp_keyid == key).all()
-            for signature in results:
+            results = make_get_request("keyinfo", key)
+            # For now we don't have the key. Just continue. Later maybe we
+            # can query additional keyservers
+            #
+            # XXX Finish
+            if results.status_code == 404:
+                continue
+            for signature in results.json()["sigs"]:
+                import pdb; pdb.set_trace()
                 if signature.key_sfp_for == contact_keyid:
                     return True
                 elif signature.key_sfp_for != key:  # Don't bother looking at self signing

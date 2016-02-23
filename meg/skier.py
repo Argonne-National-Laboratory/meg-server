@@ -4,6 +4,7 @@ meg.skier
 
 Helper functions we can use for interacting with skier
 """
+import requests
 
 
 def make_get_request(cfg, api, arg):
