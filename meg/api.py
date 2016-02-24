@@ -48,15 +48,14 @@ def create_routes(app, db, cfg, RevocationKey):
             RevocationKey.pgp_keyid_for == keyid
         )
         try:
-            armored = result.distinct().one()
+            armored = result.distinct().one().armored
         except NoResultFound:
             return "Not Found", 404
         # XXX This makes me ask the question. If we revoke a key but then
         # send the unrevoked public key back to skier does Skier handle our
         # certificate as non-revoked again?
-        import pdb; pdb.set_trace()
         return make_skier_request(
-            cfg, requests.post, "addkey?{}".format(urlencode({"keydata": armored_key}))
+            cfg, requests.post, "addkey?{}".format(urlencode({"keydata": armored}))
         )
 
     # XXX Search is pretty weak right now on Skier. We might not be able

@@ -8,5 +8,5 @@ from meg.app import create_app
 
 
 def main():
-    app = create_app(debug=True)
+    app, _ = create_app(debug=True)
     app.run()

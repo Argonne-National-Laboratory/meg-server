@@ -8,7 +8,7 @@ from pgpdump import AsciiData
 from pgpdump.packet import SignaturePacket
 from sqlalchemy import and_
 
-from meg.skier import make_get_request
+from meg.skier import get_all_key_signatures, make_get_request
 
 
 def store_revocation_cert(db, armored_key, RevocationKey):
@@ -43,7 +43,7 @@ def verify_trust_level(cfg, origin_keyid, contact_keyid):
     1 if can be validated through web of trust
     2 if we cannot trust contact
     """
-    if determine_if_implicitly_trusted(origin_keyid, contact_keyid):
+    if determine_if_explicitly_trusted(cfg, origin_keyid, contact_keyid):
         return 0
     elif determine_through_web_of_trust(cfg, origin_keyid, contact_keyid):
         return 1
@@ -51,13 +51,14 @@ def verify_trust_level(cfg, origin_keyid, contact_keyid):
         return 2
 
 
-def determine_if_implicitly_trusted(origin_keyid, contact_keyid):
+def determine_if_explicitly_trusted(cfg, origin_keyid, contact_keyid):
     """
     Determine if we directly trust the contact
     """
-    results = make_get_request("keyinfo", origin_keyid)
-    # XXX TODO
-    return True if results.first() else False
+    results = get_all_key_signatures(cfg, contact_keyid)
+    if not isinstance(results, list):  # Is a tuple of (status_code, content)
+        return False
+    return True if origin_keyid in results else False
 
 
 def determine_through_web_of_trust(cfg, origin_keyid, contact_keyid):
@@ -71,19 +72,14 @@ def determine_through_web_of_trust(cfg, origin_keyid, contact_keyid):
     def recursive_search(keyids, cur_depth):
         next_search = []
         for key in keyids:
-            results = make_get_request("keyinfo", key)
-            # For now we don't have the key. Just continue. Later maybe we
-            # can query additional keyservers
-            #
-            # XXX Finish
-            if results.status_code == 404:
+            results = get_all_key_signatures(cfg, key)
+            # If there was an error on the keyserver side
+            if not isinstance(results, list):
                 continue
-            for signature in results.json()["sigs"]:
-                import pdb; pdb.set_trace()
-                if signature.key_sfp_for == contact_keyid:
+            for signature in results:
+                if signature == origin_keyid:
                     return True
-                elif signature.key_sfp_for != key:  # Don't bother looking at self signing
-                    next_search.append(signature.key_sfp_for)
+                next_search.append(signature)
 
         cur_depth += 1
         if cur_depth > cfg.config.wot_bfs_max_depth:
@@ -92,7 +88,7 @@ def determine_through_web_of_trust(cfg, origin_keyid, contact_keyid):
             return False
 
         for signature in results:
-            recursive_search(next_search, cur_depth)
+            return recursive_search(next_search, cur_depth)
 
     cur_depth = 0
-    return recursive_search([origin_keyid], cur_depth)
+    return recursive_search([contact_keyid], cur_depth)

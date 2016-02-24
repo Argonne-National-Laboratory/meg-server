@@ -17,4 +17,4 @@ def create_app(testing=False, debug=False):
     RevocationKey = meg.db.generate_models(db)
     db.create_all()
     create_routes(app, db, cfg, RevocationKey)
-    return app
+    return app, db
