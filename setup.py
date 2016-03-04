@@ -15,6 +15,7 @@ setup(
         "configmaster>=2.3.6",
         "Flask>=0.10.1",
         "Flask-SQLAlchemy>=2.0",
+        "gunicorn",
         "pgpdump>=1.5",
         "psycopg2>=2.6.1",
         "PyYAML>=3.11",

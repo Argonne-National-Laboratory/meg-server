@@ -1,0 +1,5 @@
+---
+
+- hosts: megserver
+  roles:
+    - ansible-meg-server

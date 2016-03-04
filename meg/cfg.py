@@ -5,10 +5,10 @@ import configmaster
 
 def get_yml_config():
     file_dir = os.path.dirname(__file__)
-    meg_config = os.getenv("MEG_SERVER_CFG", default="{}/../config.yml".format(file_dir))
+    meg_config = os.getenv("MEG_SERVER_CFG", default="{}/config.yml".format(file_dir))
     cfg = configmaster.YAMLConfigFile.YAMLConfigFile(meg_config)
     cfg.apply_defaults(
-        configmaster.YAMLConfigFile.YAMLConfigFile("{}/../config.default.yml".format(file_dir))
+        configmaster.YAMLConfigFile.YAMLConfigFile("{}/config.default.yml".format(file_dir))
     )
     return cfg
 

@@ -1,0 +1,10 @@
+---
+
+- src: DavidWittman.redis
+  path: roles/
+
+- src: ANXS.postgresql
+  path: roles/
+
+- src: ANXS.nginx
+  path: roles/

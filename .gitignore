@@ -65,3 +65,9 @@ target/
 # Other stuff
 config.yml
 venv/
+
+# ansible related
+ANXS*
+DavidWittman*
+ansible-meg-server
+*.retry
