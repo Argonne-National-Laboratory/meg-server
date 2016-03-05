@@ -1,3 +1,9 @@
 ---
+megserver_version: 0.1
+megserver_gunicorn_bind_addr: unix:/var/tmp/megserver.sock
+
+nginx_default_enable: false
 
 openssl_version: 1.0.2g
+
+skier_gunicorn_bind_addr: unix:/var/tmp/skier.sock

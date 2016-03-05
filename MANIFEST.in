@@ -1,1 +1,1 @@
-recursive-include meg *.yml
+include meg/config.default.yml
