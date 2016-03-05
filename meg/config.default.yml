@@ -6,6 +6,6 @@ db:
   database: meg
 
 keyservers:
-  - http://localhost:8080
+  - http://localhost:5000
 
 wot_bfs_max_depth: 5

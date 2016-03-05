@@ -7,9 +7,8 @@ def get_yml_config():
     file_dir = os.path.dirname(__file__)
     meg_config = os.getenv("MEG_SERVER_CFG", default="{}/config.yml".format(file_dir))
     cfg = configmaster.YAMLConfigFile.YAMLConfigFile(meg_config)
-    cfg.apply_defaults(
-        configmaster.YAMLConfigFile.YAMLConfigFile("{}/config.default.yml".format(file_dir))
-    )
+    meg_default_config = os.getenv("MEG_SERVER_DEFAULT_CFG", default="{}/config.default.yml".format(file_dir))
+    cfg.apply_defaults(configmaster.YAMLConfigFile.YAMLConfigFile(meg_default_config))
     return cfg
 
 

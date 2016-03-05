@@ -65,6 +65,7 @@ target/
 # Other stuff
 config.yml
 venv/
+prodvenv/
 
 # ansible related
 ANXS*

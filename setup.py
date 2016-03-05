@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from setuptools import setup, find_packages
 
-__version__ = "0.1"
+__version__ = "0.1.2"
 
 
 setup(
@@ -10,7 +10,7 @@ setup(
     version=__version__,
     description="Server component for MEG",
     packages=find_packages(exclude=["*.tests"]),
-    package_data={"*": ["*.html"]},
+    data_files=[('config', ['meg/config.default.yml'])],
     install_requires=[
         "configmaster>=2.3.6",
         "Flask>=0.10.1",
