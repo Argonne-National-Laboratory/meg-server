@@ -66,6 +66,8 @@ target/
 config.yml
 venv/
 prodvenv/
+buildvenv/
+release_new_version.sh
 
 # ansible related
 ANXS*

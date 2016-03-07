@@ -10,7 +10,7 @@ from meg.skier import make_get_request, make_skier_request
 
 
 def create_routes(app, db, cfg, RevocationKey, GcmInstanceId):
-    @app.route("/addkey", methods=["PUT"])
+    @app.route("{}/addkey".format(cfg.config.meg_url_prefix), methods=["PUT"])
     def addkey():
         armored = request.form["keydata"]
         return make_skier_request(
@@ -21,11 +21,14 @@ def create_routes(app, db, cfg, RevocationKey, GcmInstanceId):
     #
     # But now that I think more on it we probably will in
     # case we want to sign keys. But let's worry about this later
-    @app.route("/getkey/<keyid>", methods=["GET"])
+    @app.route("{}/getkey/<keyid>".format(cfg.config.meg_url_prefix),
+               methods=["GET"])
     def getkey(keyid):
         return make_get_request(cfg, "getkey", keyid)
 
-    @app.route("/get_trust_level/<origin_keyid>/<contact_keyid>", methods=["GET"])
+    @app.route("{}/get_trust_level/<origin_keyid>/<contact_keyid>".
+               format(cfg.config.meg_url_prefix),
+               methods=["GET"])
     def get_trust_level(origin_keyid, contact_keyid):
         """
         Get the trust level of a contact that we are communicating with
@@ -37,7 +40,8 @@ def create_routes(app, db, cfg, RevocationKey, GcmInstanceId):
         # XXX TODO Error checking
         return str(verify_trust_level(cfg, origin_keyid, contact_keyid)), 200
 
-    @app.route("/store_revocation_cert", methods=["PUT"])
+    @app.route("{}/store_revocation_cert".format(cfg.config.meg_url_prefix),
+               methods=["PUT"])
     def store_revocation_cert():
         """
         Stores a revocation certificate on the machine. The
@@ -50,7 +54,11 @@ def create_routes(app, db, cfg, RevocationKey, GcmInstanceId):
 
     # XXX TODO This needs authentication otherwise everyones certificates
     # could be revoked at will
-    @app.route("/revoke_certificate/<keyid>", methods=["POST"])
+    #
+    # Also this api route should be combined with above. It should just be
+    # revocation_cert. The method should also change here to DELETE
+    @app.route("{}/revoke_certificate/<keyid>".format(cfg.config.meg_url_prefix),
+               methods=["POST"])
     def revoke_certificate(keyid):
         """
         Revoke a users public key certificate
@@ -73,11 +81,13 @@ def create_routes(app, db, cfg, RevocationKey, GcmInstanceId):
     # XXX Search is pretty weak right now on Skier. We might not be able
     # to find keys by email address which is a pretty big deal for us.
     # So lets look into this eventually and figure it out.
-    @app.route("/search/<search_str>", methods=["GET"])
+    @app.route("{}/search/<search_str>".format(cfg.config.meg_url_prefix),
+               methods=["GET"])
     def search(search_str):
         return make_get_request(cfg, "search", search_str)
 
-    @app.route("/gcm_instance_id/", methods=["PUT"])
+    @app.route("{}/gcm_instance_id/".format(cfg.config.meg_url_prefix),
+               methods=["PUT"])
     def store_gcm_instance_id():
         try:
             instance_id = request.form["gcm_instance_id"]
@@ -91,7 +101,8 @@ def create_routes(app, db, cfg, RevocationKey, GcmInstanceId):
             db.session.commit()
         return "", 200
 
-    @app.route("/decrypted_message/", methods=["GET"])
+    @app.route("{}/decrypted_message/".format(cfg.config.meg_url_prefix),
+               methods=["GET"])
     def get_decrypted_message():
         """
         Get a decrypted (decrypted by private key) message

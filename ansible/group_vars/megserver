@@ -1,5 +1,5 @@
 ---
-megserver_version: 0.1.3
+megserver_version: 0.2.1
 megserver_gunicorn_bind_addr: unix:/var/tmp/megserver.sock
 
 nginx_default_enable: false
