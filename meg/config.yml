@@ -1,9 +1,0 @@
-db:
-  port: 5432
-  host: ithilien
-  database: skier
-  password: skier
-  user: skier
-
-keyservers:
-  - http://ithilien:5000
