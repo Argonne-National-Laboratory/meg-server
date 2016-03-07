@@ -1,3 +1,4 @@
+from collections import namedtuple
 import datetime
 
 from flask.ext.sqlalchemy import SQLAlchemy
@@ -28,4 +29,18 @@ def generate_models(db):
             self.armored = armored
             self.pgp_keyid_for = key_id_for
 
-    return RevocationKey
+    class GcmInstanceId(db.Model):
+        """
+        Store phone instance id
+        """
+        id = db.Column(db.Integer, primary_key=True)
+        instance_id = db.Column(db.Text, nullable=False)
+        phone_number = db.Column(db.Text, nullable=False)
+        created_at = db.Column(db.DateTime, default=datetime.datetime.now())
+
+        def __init__(self, instance_id, phone_number):
+            self.instance_id = instance_id
+            self.phone_number = phone_number
+
+    Models = namedtuple('Models', ['RevocationKey', 'GcmInstanceId'])
+    return Models(RevocationKey, GcmInstanceId)

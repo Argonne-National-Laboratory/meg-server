@@ -9,7 +9,7 @@ from meg.pgp import store_revocation_cert as backend_cert_storage, verify_trust_
 from meg.skier import make_get_request, make_skier_request
 
 
-def create_routes(app, db, cfg, RevocationKey):
+def create_routes(app, db, cfg, RevocationKey, GcmInstanceId):
     @app.route("/addkey", methods=["PUT"])
     def addkey():
         armored = request.form["keydata"]
@@ -24,6 +24,18 @@ def create_routes(app, db, cfg, RevocationKey):
     @app.route("/getkey/<keyid>", methods=["GET"])
     def getkey(keyid):
         return make_get_request(cfg, "getkey", keyid)
+
+    @app.route("/get_trust_level/<origin_keyid>/<contact_keyid>", methods=["GET"])
+    def get_trust_level(origin_keyid, contact_keyid):
+        """
+        Get the trust level of a contact that we are communicating with
+
+        0: all good and trusted
+        1: can be verified through web of trust
+        2: untrusted
+        """
+        # XXX TODO Error checking
+        return str(verify_trust_level(cfg, origin_keyid, contact_keyid)), 200
 
     @app.route("/store_revocation_cert", methods=["PUT"])
     def store_revocation_cert():
@@ -44,10 +56,10 @@ def create_routes(app, db, cfg, RevocationKey):
         Revoke a users public key certificate
         """
         # XXX TODO Error handling
-        result = RevocationKey.query.options(load_only("armored")).filter(
-            RevocationKey.pgp_keyid_for == keyid
-        )
         try:
+            result = RevocationKey.query.options(load_only("armored")).filter(
+                RevocationKey.pgp_keyid_for == keyid
+            )
             armored = result.distinct().one().armored
         except NoResultFound:
             return "Not Found", 404
@@ -65,14 +77,53 @@ def create_routes(app, db, cfg, RevocationKey):
     def search(search_str):
         return make_get_request(cfg, "search", search_str)
 
-    @app.route("/get_trust_level/<origin_keyid>/<contact_keyid>", methods=["GET"])
-    def get_trust_level(origin_keyid, contact_keyid):
-        """
-        Get the trust level of a contact that we are communicating with
+    @app.route("/gcm_instance_id/", methods=["PUT"])
+    def store_gcm_instance_id():
+        try:
+            instance_id = request.form["gcm_instance_id"]
+            phone_number = request.form["phone_number"]
+            iid = GcmInstanceId.query.filter(GcmInstanceId.phone_number == phone_number).one()
+            iid.instance_id = instance_id
+        except NoResultFound:
+            gcm_instance_id = GcmInstanceId(instance_id, phone_number)
+            db.session.add(gcm_instance_id)
+        finally:
+            db.session.commit()
+        return "", 200
 
-        0: all good and trusted
-        1: can be verified through web of trust
-        2: untrusted
+    @app.route("/decrypted_message/", methods=["GET"])
+    def get_decrypted_message():
         """
-        # XXX TODO Error checking
-        return str(verify_trust_level(cfg, origin_keyid, contact_keyid)), 200
+        Get a decrypted (decrypted by private key) message
+
+        Stub method
+        """
+        return "", 200
+
+    @app.route("/decrypted_message/", methods=["PUT"])
+    def put_decrypted_message():
+        """
+        Put a decrypted (decrypted by private key) message on the server
+        This message will be picked up by the client eventually
+
+        Stub method
+        """
+        return "", 200
+
+    @app.route("/encrypted_message/", methods=["GET"])
+    def get_encrypted_message():
+        """
+        Get an encrypted message
+
+        Stub method
+        """
+        return "", 200
+
+    @app.route("/encrypted_message/", methods=["PUT"])
+    def put_encrypted_message():
+        """
+        Put an encrypted message onto the server
+
+        Stub method
+        """
+        return "", 200
