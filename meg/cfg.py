@@ -1,3 +1,4 @@
+from logging.config import dictConfig
 import os
 
 from celery import Celery
@@ -19,6 +20,7 @@ def configure_app(app, testing, debug):
     cfg = get_yml_config()
     configure_db(app, cfg, testing)
     celery = create_and_configure_celery(app)
+    dictConfig(cfg.config.logging.dump())
     return cfg, celery
 
 

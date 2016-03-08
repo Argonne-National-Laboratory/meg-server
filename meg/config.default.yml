@@ -11,6 +11,25 @@ gcm_api_key: ""
 keyservers:
   - http://localhost:5000
 
+logging:
+  version: 1
+  formatters:
+    default:
+      format: '%(asctime)s - %(levelname)s - %(message)s'
+      datefmt: '%Y%m%d'
+  handlers:
+    console:
+      class: 'logging.StreamHandler'
+      level: 'DEBUG'
+      formatter: 'default'
+      stream: 'ext://sys.stdout'
+  loggers:
+    root:
+      handlers:
+        - console
+      level: 'INFO'
+      propagate: false
+
 meg_url_prefix: ""
 
 timeout:

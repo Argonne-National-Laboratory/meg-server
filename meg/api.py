@@ -100,6 +100,9 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
             instance_id = request.form["gcm_instance_id"]
             phone_number = request.form["phone_number"]
             email = request.form["email"]
+            app.logger.debug("Store GCM iid: {} for email: {} phone: {}".format(
+                instance_id, email, phone_number
+            ))
             iid = GcmInstanceId.query.filter(GcmInstanceId.email == email).one()
             iid.instance_id = instance_id
         except NoResultFound:
@@ -147,6 +150,7 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         """
         email = request.form['email']
         message = request.form['message']
+        app.logger.debug("Put new encrypted message for {}".format(email))
         new_message = db_models.MessageStore(email, message)
         db.session.add(new_message)
         db.session.commit()
@@ -161,7 +165,7 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
             instance_id = db_models.GcmInstanceId.query.filter(db_models.GcmInstanceId.email == email).one()
         except NoResultFound:
             return "", 404
-        celery_tasks.transmit_gcm_uuid.apply_async(
+        celery_tasks.transmit_gcm_id.apply_async(
             (instance_id.instance_id, committed_message.id)
         )
         return "", 200
