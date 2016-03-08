@@ -32,7 +32,7 @@ logging:
     root:
       handlers:
         - console
-      level: 'INFO'
+      level: INFO
       propagate: false
     celery:
       handlers:

@@ -7,7 +7,10 @@ from gcm import GCM
 def create_celery_routes(celery, cfg):
     logger = get_task_logger(__name__)
 
-    # XXX This is kinda a thing. If we have a
+    # XXX This is kinda a thing. If we have a item that is not retried then
+    # we will not be able to deliver a message. So eventually we should probably
+    # have a cron task that takes messages that have failed their retries and
+    # continually resend them
     @celery.task(max_retries=cfg.config.celery.transmit_gcm_id.retries)
     def transmit_gcm_id(gcm_iid, id):
         gcm = GCM(cfg.config.gcm_api_key)

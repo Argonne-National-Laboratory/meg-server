@@ -122,7 +122,8 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         """
         return "", 200
 
-    @app.route("/decrypted_message/", methods=["PUT"])
+    @app.route("{}/decrypted_message/".format(cfg.config.meg_url_prefix),
+               methods=["PUT"])
     def put_decrypted_message():
         """
         Put a decrypted (decrypted by private key) message on the server
@@ -132,7 +133,8 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         """
         return "", 200
 
-    @app.route("/encrypted_message/", methods=["GET"])
+    @app.route("{}/encrypted_message/".format(cfg.config.meg_url_prefix),
+               methods=["GET"])
     def get_encrypted_message():
         """
         Get an encrypted message
@@ -141,7 +143,8 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         """
         return "", 200
 
-    @app.route("/encrypted_message/", methods=["PUT"])
+    @app.route("{}/encrypted_message/".format(cfg.config.meg_url_prefix),
+               methods=["PUT"])
     def put_encrypted_message():
         """
         Put an encrypted message onto the server
