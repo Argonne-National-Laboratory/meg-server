@@ -3,11 +3,12 @@ from collections import namedtuple
 from celery.utils.log import get_task_logger
 from gcm import GCM
 
-logger = get_task_logger(__name__)
-
 
 def create_celery_routes(celery, cfg):
-    @celery.task
+    logger = get_task_logger(__name__)
+
+    # XXX This is kinda a thing. If we have a
+    @celery.task(max_retries=cfg.config.celery.transmit_gcm_id.retries)
     def transmit_gcm_id(gcm_iid, id):
         gcm = GCM(cfg.config.gcm_api_key)
         data = {"message_id": id}
@@ -16,7 +17,7 @@ def create_celery_routes(celery, cfg):
         if 'errors' in response:
             logger.warn("Error found in response: {}".format(response))
             transmit_gcm_id.retry(
-                args=[gcm_iid, id], countdown=cfg.config.timeout.gcm_msg
+                args=[gcm_iid, id], countdown=cfg.config.celery.transmit_gcm_id.timeout
             )
         else:
             logger.debug("Message transmitted successfully response: {}".format(response))

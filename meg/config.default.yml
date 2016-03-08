@@ -1,3 +1,8 @@
+celery:
+  transmit_gcm_id:
+    retries: 10
+    timeout: 5
+
 db:
   host: localhost
   port: 5432
@@ -29,10 +34,12 @@ logging:
         - console
       level: 'INFO'
       propagate: false
+    celery:
+      handlers:
+        - console
+      level: INFO
+      propagate: false
 
 meg_url_prefix: ""
-
-timeout:
-  gcm_msg: 5
 
 wot_bfs_max_depth: 5

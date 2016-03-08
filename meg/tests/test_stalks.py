@@ -35,5 +35,5 @@ class TestStalks(object):
             tasks.transmit_gcm_id.retry = retry_mocker
             tasks.transmit_gcm_id("foobar", 1)
             retry_mocker.assert_called_once_with(
-                args=["foobar", 1], countdown=self.cfg.config.timeout.gcm_msg
+                args=["foobar", 1], countdown=self.cfg.config.celery.transmit_gcm_id.timeout
             )
