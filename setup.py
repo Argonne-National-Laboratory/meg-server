@@ -12,7 +12,7 @@ setup(
     packages=find_packages(exclude=["*.tests"]),
     data_files=[('config', ['meg/config.default.yml'])],
     install_requires=[
-        "celery",
+        "celery==3.1.22",
         "configmaster>=2.3.6",
         "Flask>=0.10.1",
         "Flask-SQLAlchemy>=2.0",
