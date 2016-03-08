@@ -14,9 +14,12 @@ def create_celery_routes(celery, cfg):
         logger.info("Transmit id: {} to phone with iid: {}".format(id, gcm_iid))
         response = gcm.json_request(registration_ids=[gcm_iid], data=data)
         if 'errors' in response:
+            logger.warn("Error found in response: {}".format(response))
             transmit_gcm_id.retry(
-                args=[gcm_iid, uuid], countdown=cfg.config.timeout.gcm_msg
+                args=[gcm_iid, id], countdown=cfg.config.timeout.gcm_msg
             )
+        else:
+            logger.debug("Message transmitted successfully response: {}".format(response))
 
     CeleryTasks = namedtuple('CeleryTasks', ['transmit_gcm_id'])
     return CeleryTasks(transmit_gcm_id)
