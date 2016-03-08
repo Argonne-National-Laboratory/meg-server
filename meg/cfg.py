@@ -1,5 +1,6 @@
 import os
 
+from celery import Celery
 import configmaster
 
 
@@ -17,7 +18,8 @@ def configure_app(app, testing, debug):
     app.config["TESTING"] = testing
     cfg = get_yml_config()
     configure_db(app, cfg, testing)
-    return cfg
+    celery = create_and_configure_celery(app)
+    return cfg, celery
 
 
 def configure_db(app, cfg, testing):
@@ -29,3 +31,10 @@ def configure_db(app, cfg, testing):
         uri = "sqlite://"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["SQLALCHEMY_DATABASE_URI"] = uri
+
+
+def create_and_configure_celery(app):
+    broker_url = "sqla+{}".format(app.config["SQLALCHEMY_DATABASE_URI"])
+    result_backend = broker_url.replace("sqla+", "db+")
+    celery = Celery("tasks", backend=result_backend, broker=broker_url)
+    return celery

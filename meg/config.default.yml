@@ -5,9 +5,15 @@ db:
   password: meg
   database: meg
 
+# User will need to fill this in themselves
+gcm_api_key: ""
+
 keyservers:
   - http://localhost:5000
 
 meg_url_prefix: ""
+
+timeout:
+  gcm_msg: 5
 
 wot_bfs_max_depth: 5

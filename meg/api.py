@@ -1,3 +1,4 @@
+from uuid import uuid4
 from urllib.parse import urlencode
 
 from flask import request
@@ -9,7 +10,11 @@ from meg.pgp import store_revocation_cert as backend_cert_storage, verify_trust_
 from meg.skier import make_get_request, make_skier_request
 
 
-def create_routes(app, db, cfg, RevocationKey, GcmInstanceId):
+def create_routes(app, db, cfg, db_models, celery_tasks):
+
+    RevocationKey = db_models.RevocationKey
+    GcmInstanceId = db_models.GcmInstanceId
+
     @app.route("{}/addkey".format(cfg.config.meg_url_prefix), methods=["PUT"])
     def addkey():
         armored = request.form["keydata"]
@@ -86,16 +91,19 @@ def create_routes(app, db, cfg, RevocationKey, GcmInstanceId):
     def search(search_str):
         return make_get_request(cfg, "search", search_str)
 
+    # XXX This method probably needs some kind of authentication other
+    # it would be pretty trivial to perform a denial of service on MEG
     @app.route("{}/gcm_instance_id/".format(cfg.config.meg_url_prefix),
                methods=["PUT"])
     def store_gcm_instance_id():
         try:
             instance_id = request.form["gcm_instance_id"]
             phone_number = request.form["phone_number"]
-            iid = GcmInstanceId.query.filter(GcmInstanceId.phone_number == phone_number).one()
+            email = request.form["email"]
+            iid = GcmInstanceId.query.filter(GcmInstanceId.email == email).one()
             iid.instance_id = instance_id
         except NoResultFound:
-            gcm_instance_id = GcmInstanceId(instance_id, phone_number)
+            gcm_instance_id = GcmInstanceId(instance_id, phone_number, email)
             db.session.add(gcm_instance_id)
         finally:
             db.session.commit()
@@ -135,6 +143,25 @@ def create_routes(app, db, cfg, RevocationKey, GcmInstanceId):
         """
         Put an encrypted message onto the server
 
-        Stub method
+        Stub-ish method
         """
+        email = request.form['email']
+        message = request.form['message']
+        new_message = db_models.MessageStore(email, message)
+        db.session.add(new_message)
+        db.session.commit()
+        committed_message = db_models.MessageStore.query.filter(
+            db_models.MessageStore.email == email
+        ).order_by(
+            db_models.MessageStore.created_at.desc()
+        ).first()
+        if not committed_message:
+            return "", 500  # this shouldn't happen
+        try:
+            instance_id = db_models.GcmInstanceId.query.filter(db_models.GcmInstanceId.email == email).one()
+        except NoResultFound:
+            return "", 404
+        celery_tasks.transmit_gcm_uuid.apply_async(
+            (instance_id.instance_id, committed_message.id)
+        )
         return "", 200

@@ -9,6 +9,8 @@ from meg.app import create_app as make_app
 from meg.db import generate_models
 
 
+EMAIL = "foo@bar.com"
+PHONE_NUMBER = "5551112222"
 PUB_KEY = """-----BEGIN PGP PUBLIC KEY BLOCK-----
 Version: GnuPG v2
 
@@ -62,6 +64,7 @@ KtJtLoGaduI=
 =qITv
 -----END PGP PUBLIC KEY BLOCK-----"""
 
+
 class MockResponse(object):
     def __init__(self, status_code, content):
         self.status_code = status_code
@@ -74,8 +77,10 @@ class MockResponse(object):
 
 class TestMEGAPI(TestCase):
     def create_app(self):
-        app, self.db, self.models = make_app(debug=True, testing=True)
-        return app
+        with patch("meg.app.create_celery_routes") as celery_routes:
+            self.celery_routes = celery_routes
+            app, self.db, self.models, _ = make_app(debug=True, testing=True)
+            return app
 
     def tearDown(self):
         self.db.session.remove()
@@ -107,7 +112,7 @@ class TestMEGAPI(TestCase):
 
     def test_get_trust_level_for_level_zero_trust(self):
         web = {
-            "http://ithilien:5000/api/v1/keyinfo/1111B": MockResponse(
+            "http://localhost:5000/api/v1/keyinfo/1111B": MockResponse(
                 200, '{"sigs": {"1111B": [["1111B"], ["1111A"]]}}'
             )
         }
@@ -120,10 +125,10 @@ class TestMEGAPI(TestCase):
 
     def test_get_trust_level_for_level_one_trust(self):
         web = {
-            "http://ithilien:5000/api/v1/keyinfo/1111B": MockResponse(
+            "http://localhost:5000/api/v1/keyinfo/1111B": MockResponse(
                 200, '{"sigs": {"1111B": [["1111B"], ["1111C"]]}}'
             ),
-            "http://ithilien:5000/api/v1/keyinfo/1111C": MockResponse(
+            "http://localhost:5000/api/v1/keyinfo/1111C": MockResponse(
                 200, '{"sigs": {"1111C": [["1111C"], ["1111A"]]}}'
             )
         }
@@ -149,12 +154,11 @@ class TestMEGAPI(TestCase):
 
     def test_store_instance_id(self):
         instance_id = "foobar"
-        phone_number = "5551112222"
-        data = {"gcm_instance_id": instance_id, "phone_number": phone_number}
+        data = {"gcm_instance_id": instance_id, "phone_number": PHONE_NUMBER, "email": EMAIL}
         response = self.client.put("/gcm_instance_id/", data=data)
         item = self.models.GcmInstanceId.query.filter(self.models.GcmInstanceId.id == 1).one()
         eq_(item.instance_id, instance_id)
-        eq_(item.phone_number, phone_number)
+        eq_(item.phone_number, PHONE_NUMBER)
         eq_(response.status_code, 200)
 
     def test_store_instance_id_on_missing_iid(self):
@@ -165,15 +169,48 @@ class TestMEGAPI(TestCase):
     def test_store_instance_id_on_same_device(self):
         # I want the behavior to be that we update the existing record.
         # it will just help with eventual code writing
-        phone_number = "5551112121"
-        data = {"gcm_instance_id": "foobar", "phone_number": phone_number}
+        data = {"gcm_instance_id": "foobar", "phone_number": PHONE_NUMBER, "email": EMAIL}
         response = self.client.put("/gcm_instance_id/", data=data)
         eq_(response.status_code, 200)
         final_iid = "bazbar"
-        data = {"gcm_instance_id": final_iid, "phone_number": phone_number}
+        data = {"gcm_instance_id": final_iid, "phone_number": PHONE_NUMBER, "email": EMAIL}
         response = self.client.put("/gcm_instance_id/", data=data)
         eq_(response.status_code, 200)
-        items = self.models.GcmInstanceId.query.filter(self.models.GcmInstanceId.phone_number == phone_number).all()
+        items = self.models.GcmInstanceId.query.filter(self.models.GcmInstanceId.phone_number == PHONE_NUMBER).all()
         eq_(len(items), 1)
         eq_(items[0].instance_id, final_iid)
-        eq_(items[0].phone_number, phone_number)
+        eq_(items[0].phone_number, PHONE_NUMBER)
+
+    def test_put_encrypted_message_success(self):
+        data = {"gcm_instance_id": "foobar", "phone_number": PHONE_NUMBER, "email": EMAIL}
+        response = self.client.put("/gcm_instance_id/", data=data)
+
+        data = {"email": EMAIL, "message": "fgsdkhjfgashjdfbsbdfkkjsg"}
+        response = self.client.put("/encrypted_message/", data=data)
+        eq_(response.status_code, 200)
+
+    def test_put_encrypted_message_error(self):
+        data = {"gcm_instance_id": "foobar", "phone_number": PHONE_NUMBER, "email": EMAIL}
+        response = self.client.put("/gcm_instance_id/", data=data)
+
+        data = {"email": EMAIL}
+        response = self.client.put("/encrypted_message/", data=data)
+        eq_(response.status_code, 400)
+
+    def test_put_encrypted_message_ensure_we_send_right_one(self):
+        iid = "foobar"
+        data = {"gcm_instance_id": iid, "phone_number": PHONE_NUMBER, "email": EMAIL}
+        response = self.client.put("/gcm_instance_id/", data=data)
+
+        MESSAGE1 = "asjhfkjsahfdkjshf"
+        MESSAGE2 = "kasfsbfkjsagdfj"
+
+        data = {"email": EMAIL, "message": MESSAGE1}
+        response = self.client.put("/encrypted_message/", data=data)
+        eq_(response.status_code, 200)
+        self.celery_routes().transmit_gcm_uuid.apply_async.assert_called_with((iid, 1))
+
+        data = {"email": EMAIL, "message": MESSAGE2}
+        response = self.client.put("/encrypted_message/", data=data)
+        eq_(response.status_code, 200)
+        self.celery_routes().transmit_gcm_uuid.apply_async.assert_called_with((iid, 2))

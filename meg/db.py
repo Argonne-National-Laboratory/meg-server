@@ -36,11 +36,28 @@ def generate_models(db):
         id = db.Column(db.Integer, primary_key=True)
         instance_id = db.Column(db.Text, nullable=False)
         phone_number = db.Column(db.Text, nullable=False)
-        created_at = db.Column(db.DateTime, default=datetime.datetime.now())
+        email = db.Column(db.Text, nullable=False)
+        created_at = db.Column(db.DateTime, nullable=False)
 
-        def __init__(self, instance_id, phone_number):
+        def __init__(self, instance_id, phone_number, email):
             self.instance_id = instance_id
             self.phone_number = phone_number
+            self.email = email
+            self.created_at = datetime.datetime.now()
 
-    Models = namedtuple('Models', ['RevocationKey', 'GcmInstanceId'])
-    return Models(RevocationKey, GcmInstanceId)
+    class MessageStore(db.Model):
+        """
+        Stores messages for eventual transmission to client or app
+        """
+        id = db.Column(db.Integer, primary_key=True)
+        email = db.Column(db.Text, nullable=False)
+        message = db.Column(db.Text, nullable=False)
+        created_at = db.Column(db.DateTime, nullable=False)
+
+        def __init__(self, email, message):
+            self.email = email
+            self.message = message
+            self.created_at = datetime.datetime.now()
+
+    Models = namedtuple('Models', ['RevocationKey', 'GcmInstanceId', 'MessageStore'])
+    return Models(RevocationKey, GcmInstanceId, MessageStore)

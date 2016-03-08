@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from setuptools import setup, find_packages
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 
 setup(
@@ -12,14 +12,16 @@ setup(
     packages=find_packages(exclude=["*.tests"]),
     data_files=[('config', ['meg/config.default.yml'])],
     install_requires=[
+        "celery",
         "configmaster>=2.3.6",
         "Flask>=0.10.1",
         "Flask-SQLAlchemy>=2.0",
-        "gunicorn",
+        "gunicorn==19.4.5",
         "pgpdump>=1.5",
         "psycopg2>=2.6.1",
+        "python-gcm==0.4",
         "PyYAML>=3.11",
-        "requests",
+        "requests==2.9.1",
     ],
     entry_points={
         "console_scripts": [
