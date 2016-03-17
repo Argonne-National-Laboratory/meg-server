@@ -208,9 +208,9 @@ class TestMEGAPI(TestCase):
         data = {"email": EMAIL, "message": MESSAGE1}
         response = self.client.put("/encrypted_message/", data=data)
         eq_(response.status_code, 200)
-        self.celery_routes().transmit_gcm_id.apply_async.assert_called_with((iid, 1))
+        self.celery_routes().transmit_gcm_id.apply_async.assert_called_with((iid, 1, "decrypt"))
 
         data = {"email": EMAIL, "message": MESSAGE2}
         response = self.client.put("/encrypted_message/", data=data)
         eq_(response.status_code, 200)
-        self.celery_routes().transmit_gcm_id.apply_async.assert_called_with((iid, 2))
+        self.celery_routes().transmit_gcm_id.apply_async.assert_called_with((iid, 2, "decrypt"))

@@ -3,6 +3,8 @@ from collections import namedtuple
 from celery.utils.log import get_task_logger
 from gcm import GCM
 
+from meg import constants
+
 
 def create_celery_routes(celery, cfg):
     logger = get_task_logger(__name__)
@@ -12,15 +14,17 @@ def create_celery_routes(celery, cfg):
     # have a cron task that takes messages that have failed their retries and
     # continually resend them
     @celery.task(max_retries=cfg.config.celery.transmit_gcm_id.retries)
-    def transmit_gcm_id(gcm_iid, id):
+    def transmit_gcm_id(gcm_iid, id, action):
+        if action not in constants.APPROVED_ACTIONS:
+            raise Exception("Choose an action that is one of {}".format(APPROVED_ACTIONS))
         gcm = GCM(cfg.config.gcm_api_key)
-        data = {"message_id": id}
+        data = {"message_id": id, "action": action}
         logger.info("Transmit id: {} to phone with iid: {}".format(id, gcm_iid))
         response = gcm.json_request(registration_ids=[gcm_iid], data=data)
         if 'errors' in response:
             logger.warn("Error found in response: {}".format(response))
             transmit_gcm_id.retry(
-                args=[gcm_iid, id], countdown=cfg.config.celery.transmit_gcm_id.timeout
+                args=[gcm_iid, id, action], countdown=cfg.config.celery.transmit_gcm_id.timeout
             )
         else:
             logger.debug("Message transmitted successfully response: {}".format(response))

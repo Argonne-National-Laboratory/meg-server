@@ -169,6 +169,6 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         except NoResultFound:
             return "", 404
         celery_tasks.transmit_gcm_id.apply_async(
-            (instance_id.instance_id, committed_message.id)
+            (instance_id.instance_id, committed_message.id, "decrypt")
         )
         return "", 200
