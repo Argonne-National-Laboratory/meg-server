@@ -214,3 +214,19 @@ class TestMEGAPI(TestCase):
         response = self.client.put("/encrypted_message/", data=data)
         eq_(response.status_code, 200)
         self.celery_routes().transmit_gcm_id.apply_async.assert_called_with((iid, 2, "decrypt"))
+
+    def test_get_encypted_message_success(self):
+        iid = "foobar"
+        data = {"gcm_instance_id": iid, "phone_number": PHONE_NUMBER, "email": EMAIL}
+        response = self.client.put("/gcm_instance_id/", data=data)
+
+        MESSAGE1 = "asjhfkjsahfdkjshf"
+        data = {"email": EMAIL, "message": MESSAGE1}
+        response = self.client.put("/encrypted_message/", data=data)
+        eq_(response.status_code, 200)
+        # We're kinda cheating here because we know the id
+        response = self.client.get("/encrypted_message/", data={"message_id": 1})
+        eq_(response.status_code, 200)
+        eq_(response.json["message"], MESSAGE1)
+        response = self.client.get("/encrypted_message/", data={"message_id": 1})
+        eq_(response.status_code, 404)

@@ -1,4 +1,4 @@
-from uuid import uuid4
+import json
 from urllib.parse import urlencode
 
 from flask import request
@@ -137,19 +137,45 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
                methods=["GET"])
     def get_encrypted_message():
         """
-        Get an encrypted message
+        Get an encrypted message. The mobile device should call this method when
+        it has been notified it has a message waiting for it. Upon calling this API the
+        server will grab the message from the database and send it to the requester.
 
-        Stub method
+        Note how we cannot actually verify the identity of who we are communicating
+        with. There needs to be a new feature added that we can ensure we are actually
+        communicating with a legitimate client.
         """
-        return "", 200
+        message_id = request.form['message_id']
+        app.logger.debug("Get encrypted message with id {}".format(message_id))
+        try:
+            message = db_models.MessageStore.query.filter(
+                db_models.MessageStore.id==int(message_id)
+            ).one()
+        except NoResultFound:
+            # Should never happen IRL. But testing yes
+            app.logger.warn("Could not find message with id {}".format(message_id))
+            return "", 404
+
+        app.logger.debug(
+            "Transmitting message id {} for user with email {}".format(message.id, message.email)
+        )
+        # XXX Is a rollback clause necessary here?
+        db.session.delete(message)
+        db.session.commit()
+        return json.dumps({"message": message.message}), 200
 
     @app.route("{}/encrypted_message/".format(cfg.config.meg_url_prefix),
                methods=["PUT"])
     def put_encrypted_message():
         """
-        Put an encrypted message onto the server
+        Put an encrypted message onto the server. The mail client should call this method
+        when it wants to transmit a message to the mobile app to be decrypted. This will
+        trigger an asynchronous request to be placed to the mobile device that notifies
+        it that a new message is ready to be received. Once this happens the mobile device
+        should then request the message be sent to them. The data in the form for this
+        method should look like
 
-        Stub-ish method
+        {"email": "foo@bar.com", "message": <encrypted message here>}
         """
         email = request.form['email']
         message = request.form['message']
@@ -163,6 +189,7 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
             db_models.MessageStore.created_at.desc()
         ).first()
         if not committed_message:
+            app.logger.error("Was not able to commit encrypted message for user with email {}".format(email))
             return "", 500  # this shouldn't happen
         try:
             instance_id = db_models.GcmInstanceId.query.filter(db_models.GcmInstanceId.email == email).one()
