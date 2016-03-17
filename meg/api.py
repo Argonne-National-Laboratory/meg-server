@@ -141,7 +141,14 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         it has been notified it has a message waiting for it. Upon calling this API the
         server will grab the message from the database and send it to the requester.
 
-        Note how we cannot actually verify the identity of who we are communicating
+        The server should return a response that looks like
+
+        {
+            "email_from": "bin@baz.org",
+            "message": < message body >,
+        }
+
+        XXX TODO Note how we cannot actually verify the identity of who we are communicating
         with. There needs to be a new feature added that we can ensure we are actually
         communicating with a legitimate client.
         """
@@ -157,12 +164,12 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
             return "", 404
 
         app.logger.debug(
-            "Transmitting message id {} for user with email {}".format(message.id, message.email)
+            "Transmitting message id {} addressed to {}".format(message.id, message.email_to)
         )
         # XXX Is a rollback clause necessary here?
         db.session.delete(message)
         db.session.commit()
-        return json.dumps({"message": message.message}), 200
+        return json.dumps({"message": message.message, "email_from": message.email_from}), 200
 
     @app.route("{}/encrypted_message/".format(cfg.config.meg_url_prefix),
                methods=["PUT"])
@@ -175,24 +182,31 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         should then request the message be sent to them. The data in the form for this
         method should look like
 
-        {"email": "foo@bar.com", "message": <encrypted message here>}
+        {
+            "email_to": "foo@bar.com",
+            "email_from": "baz@bin.org",
+            "message": <encrypted message here>
+        }
         """
-        email = request.form['email']
+        email_to = request.form['email_to']
+        email_from = request.form['email_from']
         message = request.form['message']
-        app.logger.debug("Put new encrypted message for {}".format(email))
-        new_message = db_models.MessageStore(email, message)
+        app.logger.debug("Put new encrypted message addressed to {} from {}".format(email_to, email_from))
+        new_message = db_models.MessageStore(email_to, email_from, message)
         db.session.add(new_message)
         db.session.commit()
+        # Query the db for the message id. We do not know it because it is dynamically
+        # allocated
         committed_message = db_models.MessageStore.query.filter(
-            db_models.MessageStore.email == email
+            db_models.MessageStore.email_to == email_to
         ).order_by(
             db_models.MessageStore.created_at.desc()
         ).first()
         if not committed_message:
-            app.logger.error("Was not able to commit encrypted message for user with email {}".format(email))
+            app.logger.error("Was not able to commit encrypted message addressed to email {}".format(email_to))
             return "", 500  # this shouldn't happen
         try:
-            instance_id = db_models.GcmInstanceId.query.filter(db_models.GcmInstanceId.email == email).one()
+            instance_id = db_models.GcmInstanceId.query.filter(db_models.GcmInstanceId.email == email_to).one()
         except NoResultFound:
             return "", 404
         celery_tasks.transmit_gcm_id.apply_async(

@@ -9,7 +9,8 @@ from meg.app import create_app as make_app
 from meg.db import generate_models
 
 
-EMAIL = "foo@bar.com"
+EMAIL1 = "foo@bar.com"
+EMAIL2 = "bin@baz.org"
 PHONE_NUMBER = "5551112222"
 PUB_KEY = """-----BEGIN PGP PUBLIC KEY BLOCK-----
 Version: GnuPG v2
@@ -154,7 +155,7 @@ class TestMEGAPI(TestCase):
 
     def test_store_instance_id(self):
         instance_id = "foobar"
-        data = {"gcm_instance_id": instance_id, "phone_number": PHONE_NUMBER, "email": EMAIL}
+        data = {"gcm_instance_id": instance_id, "phone_number": PHONE_NUMBER, "email": EMAIL1}
         response = self.client.put("/gcm_instance_id/", data=data)
         item = self.models.GcmInstanceId.query.filter(self.models.GcmInstanceId.id == 1).one()
         eq_(item.instance_id, instance_id)
@@ -169,11 +170,11 @@ class TestMEGAPI(TestCase):
     def test_store_instance_id_on_same_device(self):
         # I want the behavior to be that we update the existing record.
         # it will just help with eventual code writing
-        data = {"gcm_instance_id": "foobar", "phone_number": PHONE_NUMBER, "email": EMAIL}
+        data = {"gcm_instance_id": "foobar", "phone_number": PHONE_NUMBER, "email": EMAIL1}
         response = self.client.put("/gcm_instance_id/", data=data)
         eq_(response.status_code, 200)
         final_iid = "bazbar"
-        data = {"gcm_instance_id": final_iid, "phone_number": PHONE_NUMBER, "email": EMAIL}
+        data = {"gcm_instance_id": final_iid, "phone_number": PHONE_NUMBER, "email": EMAIL1}
         response = self.client.put("/gcm_instance_id/", data=data)
         eq_(response.status_code, 200)
         items = self.models.GcmInstanceId.query.filter(self.models.GcmInstanceId.phone_number == PHONE_NUMBER).all()
@@ -182,51 +183,52 @@ class TestMEGAPI(TestCase):
         eq_(items[0].phone_number, PHONE_NUMBER)
 
     def test_put_encrypted_message_success(self):
-        data = {"gcm_instance_id": "foobar", "phone_number": PHONE_NUMBER, "email": EMAIL}
+        data = {"gcm_instance_id": "foobar", "phone_number": PHONE_NUMBER, "email": EMAIL1}
         response = self.client.put("/gcm_instance_id/", data=data)
 
-        data = {"email": EMAIL, "message": "fgsdkhjfgashjdfbsbdfkkjsg"}
+        data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": "fgsdkhjfgashjdfbsbdfkkjsg"}
         response = self.client.put("/encrypted_message/", data=data)
         eq_(response.status_code, 200)
 
     def test_put_encrypted_message_error(self):
-        data = {"gcm_instance_id": "foobar", "phone_number": PHONE_NUMBER, "email": EMAIL}
+        data = {"gcm_instance_id": "foobar", "phone_number": PHONE_NUMBER, "email": EMAIL1}
         response = self.client.put("/gcm_instance_id/", data=data)
 
-        data = {"email": EMAIL}
+        data = {"email_to": EMAIL1}
         response = self.client.put("/encrypted_message/", data=data)
         eq_(response.status_code, 400)
 
     def test_put_encrypted_message_ensure_we_send_right_one(self):
         iid = "foobar"
-        data = {"gcm_instance_id": iid, "phone_number": PHONE_NUMBER, "email": EMAIL}
+        data = {"gcm_instance_id": iid, "phone_number": PHONE_NUMBER, "email": EMAIL1}
         response = self.client.put("/gcm_instance_id/", data=data)
 
         MESSAGE1 = "asjhfkjsahfdkjshf"
         MESSAGE2 = "kasfsbfkjsagdfj"
 
-        data = {"email": EMAIL, "message": MESSAGE1}
+        data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1}
         response = self.client.put("/encrypted_message/", data=data)
         eq_(response.status_code, 200)
         self.celery_routes().transmit_gcm_id.apply_async.assert_called_with((iid, 1, "decrypt"))
 
-        data = {"email": EMAIL, "message": MESSAGE2}
+        data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE2}
         response = self.client.put("/encrypted_message/", data=data)
         eq_(response.status_code, 200)
         self.celery_routes().transmit_gcm_id.apply_async.assert_called_with((iid, 2, "decrypt"))
 
     def test_get_encypted_message_success(self):
         iid = "foobar"
-        data = {"gcm_instance_id": iid, "phone_number": PHONE_NUMBER, "email": EMAIL}
+        data = {"gcm_instance_id": iid, "phone_number": PHONE_NUMBER, "email": EMAIL1}
         response = self.client.put("/gcm_instance_id/", data=data)
 
         MESSAGE1 = "asjhfkjsahfdkjshf"
-        data = {"email": EMAIL, "message": MESSAGE1}
+        data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1}
         response = self.client.put("/encrypted_message/", data=data)
         eq_(response.status_code, 200)
         # We're kinda cheating here because we know the id
         response = self.client.get("/encrypted_message/", data={"message_id": 1})
         eq_(response.status_code, 200)
         eq_(response.json["message"], MESSAGE1)
+        eq_(response.json["email_from"], EMAIL2)
         response = self.client.get("/encrypted_message/", data={"message_id": 1})
         eq_(response.status_code, 404)
