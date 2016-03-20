@@ -15,8 +15,8 @@ def create_celery_routes(celery, cfg):
     # continually resend them
     @celery.task(max_retries=cfg.config.celery.transmit_gcm_id.retries)
     def transmit_gcm_id(gcm_iid, id, action):
-        if action not in constants.APPROVED_ACTIONS:
-            raise Exception("Choose an action that is one of {}".format(APPROVED_ACTIONS))
+        if action not in constants.PHONE_ACTIONS:
+            raise Exception("Choose an action that is one of {}".format(PHONE_ACTIONS))
         gcm = GCM(cfg.config.gcm_api_key)
         data = {"message_id": id, "action": action}
         logger.info("Transmit id: {} to phone with iid: {}".format(id, gcm_iid))
