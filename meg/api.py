@@ -11,7 +11,7 @@ from meg.pgp import store_revocation_cert as backend_cert_storage, verify_trust_
 from meg.skier import make_get_request, make_skier_request
 
 
-def send_message_to_phone(app, db, db_models, celery_tasks):
+def send_message_to_phone(app, db, db_models, celery_tasks, email_to):
     # Query the db for the message id. We do not know it because it is dynamically
     # allocated
     committed_message = db_models.MessageStore.query.filter(
@@ -37,14 +37,17 @@ def put_message(app, db, db_models, celery_tasks):
     email_from = request.form['email_from']
     message = request.form['message']
     action = request.form['action']  # Can be encrypt, decrypt, or toclient
-    if action not in APPROVED_ACTIONS:
+    app.logger.debug("Put new message in db for {}, from {}, with action {}".format(
+        email_to, email_from, action
+    ))
+    if action not in constants.APPROVED_ACTIONS:
         return "", 400
     app.logger.debug("Put new {} message addressed to {} from {}".format(action, email_to, email_from))
-    new_message = db_models.MessageStore(email_to, email_from, message)
+    new_message = db_models.MessageStore(email_to, email_from, message, action)
     db.session.add(new_message)
     db.session.commit()
     if action in constants.PHONE_ACTIONS:
-        return send_message_to_phone(app, db, db_models, celery_tasks)
+        return send_message_to_phone(app, db, db_models, celery_tasks, email_to)
     return "", 200
 
 
@@ -55,6 +58,9 @@ def get_message(app, db, db_models):
     message_id = request.form.get('message_id')
     email_from = request.form.get("email_from")
     email_to = request.form.get("email_to")
+    app.logger.debug("Get message with id {}, email_from {}, email_to {}.".format(
+        message_id, email_from, email_to
+    ))
     # Must have either a message id (for use by the app) or email_from and email_to
     # (for use by the client)
     if not message_id and not (email_from and email_to):
