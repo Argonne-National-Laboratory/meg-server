@@ -104,6 +104,7 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
     @app.route("{}/addkey".format(cfg.config.meg_url_prefix), methods=["PUT"])
     def addkey():
         armored = request.form["keydata"]
+        app.logger.debug("Attempt to add key: {}".format(armored))
         return make_skier_request(
             cfg, requests.put, "addkey?{}".format(urlencode({"keydata": armored}))
         )
@@ -129,6 +130,7 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         2: untrusted
         """
         # XXX TODO Error checking
+        app.logger.debug("Get trust level for origin: {} contact: {}".format(origin_keyid, contact_keyid))
         return str(verify_trust_level(cfg, origin_keyid, contact_keyid)), 200
 
     @app.route("{}/store_revocation_cert".format(cfg.config.meg_url_prefix),
@@ -138,8 +140,8 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         Stores a revocation certificate on the machine. The
         certificate will be passed in through form data
         """
-        # XXX TODO error handling
         armored_key = request.form["keydata"]
+        app.logger.debug("Store revocation certificate: {}".format(armored_key))
         backend_cert_storage(db, armored_key, RevocationKey)
         return "Success", 200
 
@@ -156,6 +158,7 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         """
         # XXX TODO Error handling
         try:
+            app.logger.warn("Revoke certificate for key: {}".format(keyid))
             result = RevocationKey.query.options(load_only("armored")).filter(
                 RevocationKey.pgp_keyid_for == keyid
             )
