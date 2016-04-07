@@ -6,24 +6,41 @@ Perform pgp related actions here
 """
 from pgpdump import AsciiData
 from pgpdump.packet import SignaturePacket
+from pgpdump.utils import PgpdumpException
 from sqlalchemy import and_
 
+from meg.exception import BadRevocationKeyException
 from meg.skier import get_all_key_signatures, make_get_request
 
 
 def store_revocation_cert(db, armored_key, RevocationKey):
-    ascii_data = AsciiData(armored_key.encode())
+    # First be able to ensure we can add an extra newline on the fly.
+    try:
+        ascii_data = AsciiData(armored_key.encode())
+    except PgpdumpException as err:
+        # It's all bouncy castles fault. we need to insert an additional newline
+        if "BCPG" in armored_key:
+            position = armored_key.find("BCPG")
+            newline = armored_key.find("\n", position)
+            new_armored_key = armored_key[0:newline] + "\n" + armored_key[newline:]
+            ascii_data = AsciiData(new_armored_key.encode())
+        else:
+            raise err
+
     packets = list(ascii_data.packets())
 
-    # Temporary until we know if there is only 1 packet
-    if len(packets) > 1:
-        raise Exception("More than 1 packet")
     if len(packets) == 0:
-        raise Exception("No packets found")
+        raise BadRevocationKeyException("No packets found")
+
+    for packet in packets:
+        if isinstance(packet, SignaturePacket):
+            if packet.sig_type == "Key revocation signature":
+                signature = packet
+                break
+    else:
+        raise BadRevocationKeyException("No signature packet found")
 
     signature = packets[0]
-    if not isinstance(signature, SignaturePacket):
-        raise Exception("No signature packet found")
 
     created = signature.creation_time
     expires = signature.expiration_time

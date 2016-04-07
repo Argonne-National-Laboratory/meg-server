@@ -1,12 +1,15 @@
+import binascii
 import json
 from urllib.parse import urlencode
 
 from flask import request
+from pgpdump.utils import PgpdumpException
 import requests
 from sqlalchemy.orm import load_only
 from sqlalchemy.orm.exc import NoResultFound
 
 from meg import constants
+from meg.exception import BadRevocationKeyException
 from meg.pgp import store_revocation_cert as backend_cert_storage, verify_trust_level
 from meg.skier import make_get_request, make_skier_request
 
@@ -143,9 +146,12 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         Stores a revocation certificate on the machine. The
         certificate will be passed in through form data
         """
-        armored_key = request.form["keydata"]
-        app.logger.debug("Store revocation certificate: {}".format(armored_key))
-        backend_cert_storage(db, armored_key, RevocationKey)
+        try:
+            armored_key = request.form["keydata"]
+            app.logger.debug("Store revocation certificate: {}".format(armored_key))
+            backend_cert_storage(db, armored_key, RevocationKey)
+        except (BadRevocationKeyException, binascii.Error, PgpdumpException) as err:
+            return err.args[0], 400
         return "Success", 200
 
     # XXX TODO This needs authentication otherwise everyones certificates

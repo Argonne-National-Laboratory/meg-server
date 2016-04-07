@@ -68,6 +68,8 @@ PVCiOvA+YdWNojLWKiwaocWrsrn0tW9fJ0ugk2Wz/sIfo08Z7tKSnbirF2Otg6UL
 KtJtLoGaduI=
 =qITv
 -----END PGP PUBLIC KEY BLOCK-----"""
+# This second cert isn't working because it doesn't have a newline
+# following the BCPG bit so we can write a test case around it.
 REVOCATION_CERT2 = """-----BEGIN PGP PUBLIC KEY BLOCK-----
 BCPG v@RELEASE_NAME@
 mQENBFcEh6QBCAC+VC+/esqm76EkxvPc1rBNuUKDlKgJnXd+3fHAu4uYW+Vu5Z0B
@@ -133,6 +135,21 @@ class TestMEGAPI(TestCase):
         """
         response = self.client.put("/store_revocation_cert", data={"keydata": REVOCATION_CERT2})
         eq_(response.status_code, 200)
+
+    def test_revocation_storage_with_malformed_cert_binascii_error(self):
+        # Add an additional newline to the start of the cert
+        pos = REVOCATION_CERT2.find("PGP")
+        cert = REVOCATION_CERT2[:pos] + "\n" + REVOCATION_CERT2[pos:]
+        response = self.client.put("/store_revocation_cert", data={"keydata": cert})
+        eq_(response.status_code, 400)
+
+    def test_revocation_storage_with_malformed_cert_bad_rev_key_error(self):
+        # Add an additional newline to the first newline of the cert
+        # will trigger a CRC failure
+        pos = REVOCATION_CERT2.find("\n")
+        cert = REVOCATION_CERT2[:pos] + "\n" + REVOCATION_CERT2[pos:]
+        response = self.client.put("/store_revocation_cert", data={"keydata": cert})
+        eq_(response.status_code, 400)
 
     def test_addkey(self):
         mock_content = "blah"
