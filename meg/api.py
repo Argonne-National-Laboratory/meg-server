@@ -101,12 +101,12 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
     RevocationKey = db_models.RevocationKey
     GcmInstanceId = db_models.GcmInstanceId
 
-    @app.route("{}/addkey".format(cfg.config.meg_url_prefix), methods=["PUT"])
+    @app.route("{}/addkey".format(cfg.config.meg_url_prefix), methods=["PUT"], strict_slashes=False)
     def addkey():
         armored = request.form["keydata"]
         app.logger.debug("Attempt to add key: {}".format(armored))
         return make_skier_request(
-            cfg, requests.put, "addkey?{}".format(urlencode({"keydata": armored}))
+            cfg, requests.post, "addkey?{}".format(urlencode({"keydata": armored}))
         )
 
     # XXX I don't actually know if we need this API
@@ -114,13 +114,15 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
     # But now that I think more on it we probably will in
     # case we want to sign keys. But let's worry about this later
     @app.route("{}/getkey/<keyid>".format(cfg.config.meg_url_prefix),
-               methods=["GET"])
+               methods=["GET"],
+               strict_slashes=False)
     def getkey(keyid):
         return make_get_request(cfg, "getkey", keyid)
 
     @app.route("{}/get_trust_level/<origin_keyid>/<contact_keyid>".
                format(cfg.config.meg_url_prefix),
-               methods=["GET"])
+               methods=["GET"],
+               strict_slashes=False)
     def get_trust_level(origin_keyid, contact_keyid):
         """
         Get the trust level of a contact that we are communicating with
@@ -134,7 +136,8 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         return str(verify_trust_level(cfg, origin_keyid, contact_keyid)), 200
 
     @app.route("{}/store_revocation_cert".format(cfg.config.meg_url_prefix),
-               methods=["PUT"])
+               methods=["PUT"],
+               strict_slashes=False)
     def store_revocation_cert():
         """
         Stores a revocation certificate on the machine. The
@@ -151,7 +154,8 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
     # Also this api route should be combined with above. It should just be
     # revocation_cert. The method should also change here to DELETE
     @app.route("{}/revoke_certificate/<keyid>".format(cfg.config.meg_url_prefix),
-               methods=["POST"])
+               methods=["POST"],
+               strict_slashes=False)
     def revoke_certificate(keyid):
         """
         Revoke a users public key certificate
@@ -183,7 +187,8 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
     # XXX This method probably needs some kind of authentication other
     # it would be pretty trivial to perform a denial of service on MEG
     @app.route("{}/gcm_instance_id/".format(cfg.config.meg_url_prefix),
-               methods=["PUT"])
+               methods=["PUT"],
+               strict_slashes=False)
     def store_gcm_instance_id():
         try:
             instance_id = request.form["gcm_instance_id"]
@@ -202,7 +207,8 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         return "", 200
 
     @app.route("{}/decrypted_message/".format(cfg.config.meg_url_prefix),
-               methods=["GET"])
+               methods=["GET"],
+               strict_slashes=False)
     def get_decrypted_message():
         """
         Get a decrypted (decrypted by private key) message
@@ -212,7 +218,8 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         return get_message(app, db, db_models)
 
     @app.route("{}/decrypted_message/".format(cfg.config.meg_url_prefix),
-               methods=["PUT"])
+               methods=["PUT"],
+               strict_slashes=False)
     def put_decrypted_message():
         """
         Put a decrypted (decrypted by private key) message on the server
@@ -229,7 +236,8 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         return put_message(app, db, db_models, celery_tasks)
 
     @app.route("{}/encrypted_message/".format(cfg.config.meg_url_prefix),
-               methods=["GET"])
+               methods=["GET"],
+               strict_slashes=False)
     def get_encrypted_message():
         """
         Get an encrypted message. The mobile device should call this method when
@@ -269,7 +277,8 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         return get_message(app, db, db_models)
 
     @app.route("{}/encrypted_message/".format(cfg.config.meg_url_prefix),
-               methods=["PUT"])
+               methods=["PUT"],
+               strict_slashes=False)
     def put_encrypted_message():
         """
         Put an encrypted message onto the server. The mail client should call this method

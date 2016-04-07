@@ -68,6 +68,30 @@ PVCiOvA+YdWNojLWKiwaocWrsrn0tW9fJ0ugk2Wz/sIfo08Z7tKSnbirF2Otg6UL
 KtJtLoGaduI=
 =qITv
 -----END PGP PUBLIC KEY BLOCK-----"""
+REVOCATION_CERT2 = """-----BEGIN PGP PUBLIC KEY BLOCK-----
+BCPG v@RELEASE_NAME@
+mQENBFcEh6QBCAC+VC+/esqm76EkxvPc1rBNuUKDlKgJnXd+3fHAu4uYW+Vu5Z0B
+MYHTBtFTpNuRJLrWBUDhqvhamzWf8rYASUBhv747clp1CW9hdaJ6EDkFG8DpKZG7
+H2wSqzD3LiXPmCvxXWgKX1aajjpVsH2Z20whZG6yMqs6KMhakik8FItYe9fKTWNc
+dqLJFh8O+p6qKYdAZ0I4PDVPGDuYO18G10IX22TAgj5rDi2lwYyBl6O+q2BaDfdM
+ovmEam8JpqEjvyGdwa0WpcozQoDroLQTBooLAE/5WH5R/Lkxk3+xU6CBs16nJxiH
+DonAoQNguUurIWbjcGNw0+LRJTIWkRLjoDp/ABEBAAGJAWUEIAECAE8FAlcEh6QX
+jIABdOQTBIyxljzQW7VHMaCuGxNjN8UwnQNhdXRvbWF0aWNhbGx5IGdlbmVyYXRl
+ZCByZXZvY2F0aW9uIGNlcnRpZmljYXRlAAoJEDGgrhsTYzfFzlkH/20RIIOEtap3
+h04zARvtbEnA2doPqkjbaAiQCh4m1cbFAq39i/mMYJlylVbOphebyuvXI11YiaQ9
+TqvlhWHF6PNA/h2ISBlZXD5UqOgwcjEt7PN5in/XaxlPbDABEWnZkvRTaZiqz+Vn
+i2By16afpdH1aLmW9zJtSUapoHiRAMWq4tGXL/8KP+2YDmF3tgLJOC8K8AB+WpmL
+Oact5Xf76OEo9Xy2yuE3h7bhpac5MINyDTMIwa/Y+JOM2dbu/a1BVkB2cFxZPe8P
+zh0jFi1UB3uWFQ3/opfm0znZecrNWIE4U+ZesD2ShLJeRvd6reMIn0QB+1qLgUU6
+WV0PkIhC8K60D2ZvbyBiYXIgYUBiLmNvbYkBHAQTAQIABgUCVwSHpAAKCRAxoK4b
+E2M3xTftB/4rv9rUBbaDnEImQfmbxJXtnEuXfo8UiunYlMJcCXGePvTCDJAY1LMJ
+TiVVJj9+38GSuDo+h3/gx3KaJotO5D+Z75O2tYTLfTktjv9I0LTdekH4RLPzV8aU
+l8j0qSld1jSslUhr46sPgyBVkcgP+CrRuq6wG18xI+rxVdgU+TCPryMIsWErPsDi
+ewQ29FtgwJ/KkBWtv7QVEMR3tuQQMFH7rGgfWMZS51DSDYwGRq2exoEau1MWVzxP
+7hTQfhliNG4GZPI0R6Powh2L+G41jKMn7fC+BU7np+6V8cQIEM4VUPSeOv9TV+t4
+t8LdAeusaEu+31ZK5/lOhxQnQlnKzsDi
+=vySY
+-----END PGP PUBLIC KEY BLOCK-----"""
 TO_CLIENT = "toclient"
 
 
@@ -92,7 +116,7 @@ class TestMEGAPI(TestCase):
         self.db.session.remove()
         self.db.drop_all()
 
-    def test_revocation_storage(self):
+    def test_revocation_storage1(self):
         """
         This test is not a guarantee that the DB interactions will work
         correctly but at least validates that something on the code
@@ -101,10 +125,19 @@ class TestMEGAPI(TestCase):
         response = self.client.put("/store_revocation_cert", data={"keydata": REVOCATION_CERT})
         eq_(response.status_code, 200)
 
+    def test_revocation_storage2(self):
+        """
+        This test is not a guarantee that the DB interactions will work
+        correctly but at least validates that something on the code
+        side of things is not horribly wrong
+        """
+        response = self.client.put("/store_revocation_cert", data={"keydata": REVOCATION_CERT2})
+        eq_(response.status_code, 200)
+
     def test_addkey(self):
         mock_content = "blah"
         with patch("meg.api.requests") as mock_requests:
-            mock_requests.put.return_value = MockResponse(200, mock_content)
+            mock_requests.post.return_value = MockResponse(200, mock_content)
             response = self.client.put("/addkey", data={"keydata": PUB_KEY})
             eq_(response.data.decode(), mock_content)
             eq_(response.status_code, 200)
@@ -146,7 +179,7 @@ class TestMEGAPI(TestCase):
             eq_(response.data.decode(), "1")
 
     def test_revoke_cert(self):
-        self.test_revocation_storage()
+        self.test_revocation_storage1()
         mock_content = "blah"
         with patch("meg.api.requests") as mock_requests:
             mock_requests.post.return_value = MockResponse(200, mock_content)
