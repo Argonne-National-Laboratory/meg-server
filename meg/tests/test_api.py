@@ -136,6 +136,14 @@ class TestMEGAPI(TestCase):
         response = self.client.put("/store_revocation_cert", data={"keydata": REVOCATION_CERT2})
         eq_(response.status_code, 200)
 
+    def test_revocation_storage_with_multiples(self):
+        self.test_revocation_storage1()
+        self.test_revocation_storage1()
+        results = self.models.RevocationKey.query.filter(
+            self.models.RevocationKey.armored == REVOCATION_CERT
+        ).all()
+        eq_(len(list(results)), 1)
+
     def test_revocation_storage_with_malformed_cert_binascii_error(self):
         # Add an additional newline to the start of the cert
         pos = REVOCATION_CERT2.find("PGP")

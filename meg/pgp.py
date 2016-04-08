@@ -8,6 +8,7 @@ from pgpdump import AsciiData
 from pgpdump.packet import SignaturePacket
 from pgpdump.utils import PgpdumpException
 from sqlalchemy import and_
+from sqlalchemy.orm.exc import NoResultFound
 
 from meg.exception import BadRevocationKeyException
 from meg.skier import get_all_key_signatures, make_get_request
@@ -18,7 +19,7 @@ def store_revocation_cert(db, armored_key, RevocationKey):
     try:
         ascii_data = AsciiData(armored_key.encode())
     except PgpdumpException as err:
-        # It's all bouncy castles fault. we need to insert an additional newline
+        # It's all bouncy castles fault (or pgpdump). we need to insert an additional newline
         if "BCPG" in armored_key:
             position = armored_key.find("BCPG")
             newline = armored_key.find("\n", position)
@@ -40,16 +41,19 @@ def store_revocation_cert(db, armored_key, RevocationKey):
     else:
         raise BadRevocationKeyException("No signature packet found")
 
-    signature = packets[0]
-
     created = signature.creation_time
     expires = signature.expiration_time
     length = signature.length
     key_id = signature.key_id.decode()[-8:]  # We just need the last 8 chars
 
-    revocation_key = RevocationKey(created, expires, length, armored_key, key_id)
-    db.session.add(revocation_key)
-    db.session.commit()
+    try:
+        # XXX Can two keys have the same id? I mean can there be collision with
+        # the last 8 digits?
+        RevocationKey.query.filter(RevocationKey.pgp_keyid_for == key_id).one()
+    except NoResultFound:
+        revocation_key = RevocationKey(created, expires, length, armored_key, key_id)
+        db.session.add(revocation_key)
+        db.session.commit()
 
 
 def verify_trust_level(cfg, origin_keyid, contact_keyid):
