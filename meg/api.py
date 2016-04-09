@@ -1,8 +1,9 @@
 import binascii
+from io import BytesIO
 import json
 from urllib.parse import urlencode
 
-from flask import request
+from flask import request, Response
 from pgpdump.utils import PgpdumpException
 import requests
 from sqlalchemy.orm import load_only
@@ -14,7 +15,7 @@ from meg.pgp import store_revocation_cert as backend_cert_storage, verify_trust_
 from meg.skier import make_get_request, make_skier_request
 
 
-def send_message_to_phone(app, db, db_models, celery_tasks, email_to):
+def send_message_to_phone(app, db, db_models, celery_tasks, action, email_to):
     # Query the db for the message id. We do not know it because it is dynamically
     # allocated
     committed_message = db_models.MessageStore.query.filter(
@@ -35,32 +36,61 @@ def send_message_to_phone(app, db, db_models, celery_tasks, email_to):
     return "", 200
 
 
+def store_message_from_phone(app, db, db_models, request):
+    associated_message_id = request.args["associated_message_id"]
+    associated_message = db_models.MessageStore.query.filter(db_models.MessageStore.id == int(associated_message_id)).first()
+    if not associated_message:  # This is not good in the case of a valid message
+        return "", 404
+    app.logger.debug("Store message for client to: {} from: {} id: {}".format(
+        associated_message.email_to,
+        associated_message.email_from,
+        associated_message_id
+    ))
+    new_message = db_models.MessageStore(
+        associated_message.email_to,
+        associated_message.email_from,
+        request.data,
+        request.args["action"]
+    )
+    db.session.add(new_message)
+    db.session.commit()
+    return "", 200
+
+
 def put_message(app, db, db_models, celery_tasks):
-    email_to = request.form['email_to']
-    email_from = request.form['email_from']
-    message = request.form['message']
-    action = request.form['action']  # Can be encrypt, decrypt, or toclient
+    content_type = request.headers["Content-Type"]
+    if not content_type == "application/octet-stream":
+        return "", 415
+    action = request.args['action']  # Can be encrypt, decrypt, or toclient
+    if action == "toclient":
+        return store_message_from_phone(app, db, db_models, request)
+    message = request.data
+    email_to = request.args['email_to']
+    email_from = request.args['email_from']
     app.logger.debug("Put new message in db for {}, from {}, with action {}".format(
         email_to, email_from, action
     ))
     if action not in constants.APPROVED_ACTIONS:
         return "", 400
     app.logger.debug("Put new {} message addressed to {} from {}".format(action, email_to, email_from))
-    new_message = db_models.MessageStore(email_to, email_from, message, action)
-    db.session.add(new_message)
-    db.session.commit()
-    if action in constants.PHONE_ACTIONS:
-        return send_message_to_phone(app, db, db_models, celery_tasks, email_to)
-    return "", 200
+    try:  # Ensure the message is in the right format (not a string)
+        message.decode()
+    except UnicodeDecodeError:
+        new_message = db_models.MessageStore(email_to, email_from, message, action)
+        db.session.add(new_message)
+        db.session.commit()
+    else:
+        return "", 415
+    return send_message_to_phone(app, db, db_models, celery_tasks, action, email_to)
 
 
 def get_message(app, db, db_models):
     # XXX This doesn't cover the case of having multiple messages from the same person to
     # the same recipient but with different subject lines. For now punt on the problem since
     # we don't need to solve it right now
-    message_id = request.form.get('message_id')
-    email_from = request.form.get("email_from")
-    email_to = request.form.get("email_to")
+    message_id = request.args.get('message_id')
+    email_from = request.args.get("email_from")
+    email_to = request.args.get("email_to")
     app.logger.debug("Get message with id {}, email_from {}, email_to {}.".format(
         message_id, email_from, email_to
     ))
@@ -83,20 +113,15 @@ def get_message(app, db, db_models):
         ).first()
 
     if not message:
-        app.logger.warn("Could not find message with id: to: {} from: {}".format(
+        app.logger.warn("Could not find message with id: {} to: {} from: {}".format(
             message_id, email_to, email_from)
         )
         return "", 404
-    response = {
-        "action": message.action,
-        "message": message.message,
-        "email_from": message.email_from,
-        "email_to": message.email_to
-    }
-    # XXX Is a rollback clause necessary here?
-    db.session.delete(message)
-    db.session.commit()
-    return json.dumps(response), 200
+    return Response(
+        BytesIO(message.message),
+        headers={"Content-Type": "application/octet-stream"},
+        status=200
+    )
 
 
 def create_routes(app, db, cfg, db_models, celery_tasks):
@@ -112,10 +137,6 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
             cfg, requests.post, "addkey?{}".format(urlencode({"keydata": armored}))
         )
 
-    # XXX I don't actually know if we need this API
-    #
-    # But now that I think more on it we probably will in
-    # case we want to sign keys. But let's worry about this later
     @app.route("{}/getkey/<keyid>".format(cfg.config.meg_url_prefix),
                methods=["GET"],
                strict_slashes=False)
@@ -212,14 +233,40 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
             db.session.commit()
         return "", 200
 
+    @app.route("{}/getkey_by_message_id/".format(cfg.config.meg_url_prefix),
+               methods=["GET"],
+               strict_slashes=False)
+    def get_enc_key_by_message_id():
+        """
+        Get the public key of the that encrypted a message
+        """
+        try:
+            message_id = request.args["associated_message_id"]
+            message = db_models.MessageStore.query.filter(
+                db_models.MessageStore.id == message_id
+            ).one()
+            content, code = make_get_request(cfg, "search", message.email_from)
+            if code != 200:
+                return "", code
+            # XXX TODO this is only going to work if the user has 1 email address in the
+            # system and they have nothing that is revoked... uh don't need to solve
+            # this right now but will later.
+            id = json.loads(content)["ids"][0]
+            content, code = getkey(id)
+            if code != 200:
+                return "", code
+            response = json.loads(content)["key"]
+        except NoResultFound:
+            return "", 404
+        else:
+            return Response(response, content_type="text/html; charset=ascii", status=200)
+
     @app.route("{}/decrypted_message/".format(cfg.config.meg_url_prefix),
                methods=["GET"],
                strict_slashes=False)
     def get_decrypted_message():
         """
         Get a decrypted (decrypted by private key) message
-
-        Stub method
         """
         return get_message(app, db, db_models)
 
@@ -231,13 +278,6 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         Put a decrypted (decrypted by private key) message on the server
         This message will either be sent to the phone to be encrypted or
         sent back to the client dependant on what we want.
-
-        {
-            "email_to": "foo@bar.com",
-            "email_from": "baz@bin.org",
-            "action": ("encrypt"|"toclient"),
-            "message": <decrypted message here>
-        }
         """
         return put_message(app, db, db_models, celery_tasks)
 
@@ -252,29 +292,6 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         can also be called by the mail client to receive a recently encrypted message so
         that it can be sent to a recipient. Depending on which party performs the request
         different data will need to be used in the body
-
-        From mobile:
-
-        {
-            "message_id": 1
-        }
-
-        From client:
-
-        {
-            "email_to": "foo@bar.com",
-            "email_from": "bin@baz.com",
-        }
-
-
-        The server should return a response that looks like
-
-        {
-            "action": ("toclient"|"decrypt"),
-            "email_to": "foo@bar.com",
-            "email_from": "bin@baz.org",
-            "message": < message body >,
-        }
 
         XXX TODO Note how we cannot actually verify the identity of who we are communicating
         with. There needs to be a new feature added that we can ensure we are actually
@@ -295,14 +312,5 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         we want to send an encrypted message back to the mail client. This will not
         trigger anything but rather the server will just store the message until the
         mail client picks it back up.
-
-        The data in the form for this method should look like
-
-        {
-            "email_to": "foo@bar.com",
-            "email_from": "baz@bin.org",
-            "action": ("decrypt"|"toclient"),
-            "message": <encrypted message here>
-        }
         """
         return put_message(app, db, db_models, celery_tasks)

@@ -1,4 +1,6 @@
 import os
+from io import BytesIO
+import json
 from unittest.mock import patch
 
 from flask import Flask
@@ -13,8 +15,9 @@ DECRYPT = "decrypt"
 EMAIL1 = "foo@bar.com"
 EMAIL2 = "bin@baz.org"
 ENCRYPT = "encrypt"
-MESSAGE1 = "asjhfkjsahfdkjshf"
-MESSAGE2 = "kasfsbfkjsagdfj"
+GCM_IID = "foobar"
+MESSAGE1 = b'\x85\x01\x0c\x03\xd3\xd6\x13o0\x01-=\x01\x07\xffN\xb7Q\x0e \x9cZx\xc6\xb4f$\xf9\xd8\xf5\xff\xc2a\xc9\xad5\xdbu.Ri\xf9E\x10\xcf\xc2\xf8\xe4b\xe9\x16\xcf\x1f\xf5\xfe\xf8\xda\x8f\xeb\xaf\xd2;\x1dx\x8a\xc3\x0bz\x93\xdc=\xa0\x8d! \xf8\xf3\x92\x83 \xa9\xd3t\xf3\x81\x8e\x1e!\xb8\xafRB{6\x18\x83{\x8b\xe6*\xac\xd373\x93\x1f/a|\xb4A\xccodO\xff\x80\r\xa4\xa0#\x84q\x0fn\xcd\x04\x82j\xa0\xee\xb8Z\xfe\xda\xb5E\xf9\x95\x19iI|\x14+4F\xa5\xa8\xae\xa9\n"$q\xdb\x97j\'V\xb3s\x1aE\xb1\x04\xda\xf9]hI\x85\xe4\xc4ao\x99\xc8ZA\xd5\x88\xbf\xe8\xd0\x1d\xd9&\x1e\xb8\xec\x85;\xc0OlA\xd02\xd3\xd6\xfc\x07\xf4m\x1a\x0c\x1c\xde\xa2\xc6 \x0cOMkA\x9dF\x9d*\x9e\xd7\x8c\xeb\x9a\xdb\x81p\xa6\xecF\x9eo!\\\x10\xd1\xdd1{\xa6G\xfd\xcc\x10\xe7P\xde4\xe9Id9\xa3\xf5\x0cl\xe6\x8c4\x9aN+fn\x14\xa9M\xfe\xda\xc9)\x9e#[\xa3\xf2\x90\xa6K\xfa3|\x8d#\xf2\xec\x004?\xcd\xce\xd5:\xda\x94\xf6\xc8\xda\x81y\xfaB<\xc0a,a\xabe\xe8\x95\x08'
+MESSAGE2 = b'\x85\x01\x0c\x03\xd3\xd6\x13o0\x01-=\x01\x07\xff\x7f<\xcbg\x94&q8\xff\xf0\xe6\xb7j\xd6\xde~\xcdWG\x08>\xfa\xb9:\x13\x86\x91\x1c\x7f\xf4\x06\xe8\x01dP\x1a4\xf1\x85G\x8c\xdd\xdc\xdaX\x1d\x8d\x13\xd2d\x1f\xfc&\x1f\xec\x88\xd5\xcf\x142\x0b2\xb4\xe3PFHR`qQ\x1d\xa4\xf5\xddp\x10\xd1\xfc\x06@\xe6<\xc0\x11\xe6+\xe4\xaeJ\xf6D\x90\xa1\x15U\xda\xaa\xed\xac,{\x16\xe2\xdd\x9bt\t\x8ef\xe2c\x1c*E\xf1gO.\xfbw\xf187\t2\x9b\xe8\x1e\x7f8\x16\xc1w\x1c\x17\xe6\x0bri\xe9\xab\x83\xb9)\\\xcf5\xa9A\xa0\xd3G\xb3.\xe8G\xd9\xfe:\x8f\xe0\x1e\xcb\x15\xd1%\xc7\x07\x87 \x94\xd6\x8dmWT\xce\xfc\xc4\xd7}4\xbfB\x8dN\xf2\x85\xd8`\x87/Y\x06?\xbec\xfa*\xe6@\x9f\xd5\x83\x85\xd9\x98\xb0\x120h\xa2\xfd\xa6\xc9\xca\xd4!\xebj\xc3B\xc1\xbdo\\\xd4\xb4\xa05`\xb2\xfc\xa0\xa7*Q\xa6,Z@L`\xb6]&\xa4Q\xca\xa5\x1d\xd9E\xa4\x98\xc9"\x18e\x97]\x95\xc6\x14\xea\xbc|n}\xee-\x8e\x1aq4\x1fT\xb1\xcea\xdd\xbf\x7f\xdc\xb8\xf2\x80\x00\xda\x1f['
 PHONE_NUMBER = "5551112222"
 PUB_KEY = """-----BEGIN PGP PUBLIC KEY BLOCK-----
 Version: GnuPG v2
@@ -246,49 +249,55 @@ class TestMEGAPI(TestCase):
         eq_(items[0].phone_number, PHONE_NUMBER)
 
     def test_put_encrypted_message_success_with_decrypt(self):
-        data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": "fgsdkhjfgashjdfbsbdfkkjsg", "action": DECRYPT}
-        self.put_encrypted_message(data, 200)
+        data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": DECRYPT}
+        self.put_encrypted_message_with_gcm_addition(data, 200)
 
     def test_put_encrypted_message_success_with_encrypt(self):
-        data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": "fgsdkhjfgashjdfbsbdfkkjsg", "action": ENCRYPT}
-        self.put_encrypted_message(data, 200)
+        data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": ENCRYPT}
+        self.put_encrypted_message_with_gcm_addition(data, 200)
 
     def test_put_encrypted_message_error_no_email_from(self):
         """
         Test PUT for /encrypted_message/ by not adding email_from
         """
         data = {"email_to": EMAIL1, "action": DECRYPT, "message": MESSAGE1}
-        self.put_encrypted_message(data, 400)
+        self.put_encrypted_message_with_gcm_addition(data, 400)
 
     def test_put_encrypted_message_ensure_we_send_right_one(self):
-        iid = "foobar"
-        data = {"gcm_instance_id": iid, "phone_number": PHONE_NUMBER, "email": EMAIL1}
-        response = self.client.put("/gcm_instance_id/", data=data)
-
         data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": DECRYPT}
-        response = self.client.put("/encrypted_message/", data=data)
-        eq_(response.status_code, 200)
-        self.celery_routes().transmit_gcm_id.apply_async.assert_called_with((iid, 1, "decrypt"))
+        self.put_encrypted_message_with_gcm_addition(data, 200)
+
+        self.celery_routes().transmit_gcm_id.apply_async.assert_called_with((GCM_IID, 1, "decrypt"))
 
         data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE2, "action": DECRYPT}
-        response = self.client.put("/encrypted_message/", data=data)
-        eq_(response.status_code, 200)
-        self.celery_routes().transmit_gcm_id.apply_async.assert_called_with((iid, 2, "decrypt"))
+        self.put_encrypted_message(data, 200)
+        self.celery_routes().transmit_gcm_id.apply_async.assert_called_with((GCM_IID, 2, "decrypt"))
 
     def test_put_encrypted_message_error_bad_action(self):
         data = {"email_to": EMAIL1, "action": DECRYPT, "message": MESSAGE1, "action": "blah"}
-        self.put_encrypted_message(data, 400)
+        self.put_encrypted_message_with_gcm_addition(data, 400)
 
     def test_put_encrypted_message_without_phone_action(self):
-        data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": TO_CLIENT}
+        data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": DECRYPT}
+        self.put_encrypted_message_with_gcm_addition(data, 200)
+        eq_(self.celery_routes().transmit_gcm_id.apply_async.call_count, 1)
+        data = {"associated_message_id": "1", "message": MESSAGE1, "action": TO_CLIENT}
         self.put_encrypted_message(data, 200)
-        eq_(self.celery_routes().transmit_gcm_id.apply_async.call_count, 0)
+
+    def put_encrypted_message_with_gcm_addition(self, put_data, expected_code):
+        data = {"gcm_instance_id": GCM_IID, "phone_number": PHONE_NUMBER, "email": EMAIL1}
+        response = self.client.put("/gcm_instance_id/", data=data)
+        self.put_encrypted_message(put_data, expected_code)
 
     def put_encrypted_message(self, put_data, expected_code):
-        data = {"gcm_instance_id": "foobar", "phone_number": PHONE_NUMBER, "email": EMAIL1}
-        response = self.client.put("/gcm_instance_id/", data=data)
-
-        response = self.client.put("/encrypted_message/", data=put_data)
+        file = BytesIO(put_data["message"])
+        del put_data["message"]
+        response = self.client.put(
+            "/encrypted_message/",
+            query_string=put_data,
+            input_stream=file,
+            headers={"Content-Type": "application/octet-stream"}
+        )
         eq_(response.status_code, expected_code)
 
     def test_get_encrypted_message_success_with_message_id(self):
@@ -297,40 +306,47 @@ class TestMEGAPI(TestCase):
 
         Eventually mock the phone calling to grab the message for decryption
         """
-        iid = "foobar"
-        data = {"gcm_instance_id": iid, "phone_number": PHONE_NUMBER, "email": EMAIL1}
-        response = self.client.put("/gcm_instance_id/", data=data)
-
-        MESSAGE1 = "asjhfkjsahfdkjshf"
         data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": DECRYPT}
-        response = self.client.put("/encrypted_message/", data=data)
-        eq_(response.status_code, 200)
+        self.put_encrypted_message_with_gcm_addition(data, 200)
         # We're kinda cheating here because we know the id
-        response = self.client.get("/encrypted_message/", data={"message_id": 1})
+        response = self.client.get("/encrypted_message/?message_id={}".format(1))
         eq_(response.status_code, 200)
-        eq_(response.json["message"], MESSAGE1)
-        eq_(response.json["email_from"], EMAIL2)
-        response = self.client.get("/encrypted_message/", data={"message_id": 1})
-        eq_(response.status_code, 404)
+        eq_(response.data, MESSAGE1)
 
     def test_get_decrypted_email_to_client(self):
-        data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": TO_CLIENT}
+        data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": DECRYPT}
+        self.put_encrypted_message_with_gcm_addition(data, 200)
+        data = {"associated_message_id": 1, "message": MESSAGE1, "action": TO_CLIENT}
         self.put_encrypted_message(data, 200)
-        response = self.client.get("/encrypted_message/", data={"email_from": EMAIL2, "email_to": EMAIL1})
+        response = self.client.get("/encrypted_message/?email_from={}&email_to={}".format(EMAIL2, EMAIL1))
         eq_(response.status_code, 200)
-        eq_(response.json["email_to"], EMAIL1)
-        eq_(response.json["email_from"], EMAIL2)
-        eq_(response.json["message"], MESSAGE1)
-        eq_(response.json["action"], TO_CLIENT)
+        eq_(response.data, MESSAGE1)
 
     def test_get_encrypted_message_without_message_id_or_all_email_info1(self):
         data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": DECRYPT}
-        self.put_encrypted_message(data, 200)
+        self.put_encrypted_message_with_gcm_addition(data, 200)
         response = self.client.get("/encrypted_message/", data={"email_from": EMAIL2})
         eq_(response.status_code, 400)
 
     def test_get_encrypted_message_without_message_id_or_all_email_info2(self):
         data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": DECRYPT}
-        self.put_encrypted_message(data, 200)
+        self.put_encrypted_message_with_gcm_addition(data, 200)
         response = self.client.get("/encrypted_message/", data={"email_to": EMAIL2})
         eq_(response.status_code, 400)
+
+    def test_getkey_by_message_id(self):
+        data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": DECRYPT}
+        self.put_encrypted_message_with_gcm_addition(data, 200)
+        with patch("meg.skier.requests") as mock_requests:
+            # invariably we just need the public key... and I'm a little bit too
+            # lazy to do this with a side_effect atm
+            mock_requests.get.return_value = MockResponse(200, json.dumps({"key": PUB_KEY, "ids": ["1234"]}))
+            response = self.client.get("/getkey_by_message_id/?associated_message_id=1")
+            eq_(response.status_code, 200)
+            eq_(response.data, bytes(PUB_KEY, "ascii"))
+
+    def test_getkey_by_message_id_err_no_msg(self):
+        with patch("meg.skier.requests") as mock_requests:
+            mock_requests.get.return_value = MockResponse(200, json.dumps({"key": PUB_KEY, "ids": ["1234"]}))
+            response = self.client.get("/getkey_by_message_id/?associated_message_id=1")
+            eq_(response.status_code, 404)

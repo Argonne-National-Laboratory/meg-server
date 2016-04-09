@@ -53,7 +53,7 @@ def generate_models(db):
         action = db.Column(db.VARCHAR(8), nullable=False)
         email_to = db.Column(db.Text, nullable=False)
         email_from = db.Column(db.Text, nullable=False)
-        message = db.Column(db.Text, nullable=False)
+        message = db.Column(db.Binary, nullable=False)
         created_at = db.Column(db.DateTime, nullable=False)
 
         def __init__(self, email_to, email_from, message, action):

@@ -26,9 +26,8 @@ def configure_app(app, testing, debug):
 
 def configure_db(app, cfg, testing):
     if not testing:
-        uri = "postgresql://{user}:{password}@{host}:{port}/{database}".format(
-            **cfg.config.db
-        )
+        uri = "postgresql://{user}:{password}@{host}:{port}/{database}?client_encoding=utf8".\
+            format(**cfg.config.db)
     else:
         uri = "sqlite://"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
