@@ -8,6 +8,7 @@ from flask.ext.testing import TestCase
 from nose.tools import eq_
 
 from meg.app import create_app as make_app
+from meg.cfg import configure_app
 from meg.db import generate_models
 
 
@@ -115,6 +116,7 @@ class TestMEGAPI(TestCase):
         with patch("meg.app.create_celery_routes") as celery_routes:
             self.celery_routes = celery_routes
             app, self.db, self.models, _ = make_app(debug=True, testing=True)
+            self.cfg, _ = configure_app(app, True, True)
             return app
 
     def tearDown(self):
@@ -341,7 +343,7 @@ class TestMEGAPI(TestCase):
         with patch("meg.skier.requests") as mock_requests:
             # invariably we just need the public key... and I'm a little bit too
             # lazy to do this with a side_effect atm
-            mock_requests.get.return_value = MockResponse(200, json.dumps({"key": PUB_KEY, "ids": ["1234"]}))
+            mock_requests.get.return_value = MockResponse(200, bytes(json.dumps({"key": PUB_KEY, "ids": ["1234"]}), "utf8"))
             response = self.client.get("/getkey_by_message_id/?associated_message_id=1")
             eq_(response.status_code, 200)
             eq_(response.data, bytes(PUB_KEY, "ascii"))
@@ -351,3 +353,19 @@ class TestMEGAPI(TestCase):
             mock_requests.get.return_value = MockResponse(200, json.dumps({"key": PUB_KEY, "ids": ["1234"]}))
             response = self.client.get("/getkey_by_message_id/?associated_message_id=1")
             eq_(response.status_code, 404)
+
+    def test_getkey_by_message_id_with_side_effect(self):
+        def side_effect(arg):
+            keyid = "111"
+            return {
+                "{}/api/v1/search/{}".format(self.cfg.config.keyservers[0], EMAIL1): MockResponse(200, bytes(json.dumps({"ids": [keyid]}), "utf8")),
+                "{}/api/v1/getkey/{}".format(self.cfg.config.keyservers[0], keyid): MockResponse(200, bytes(json.dumps({"key": PUB_KEY}), "utf8")),
+            }[arg]
+
+        data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": DECRYPT}
+        self.put_encrypted_message_with_gcm_addition(data, 200)
+        with patch("meg.skier.requests") as mock_requests:
+            mock_requests.get.side_effect = side_effect
+            response = self.client.get("/getkey_by_message_id/?associated_message_id=1")
+            eq_(response.status_code, 200)
+            eq_(response.data, bytes(PUB_KEY, "ascii"))

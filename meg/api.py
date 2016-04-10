@@ -246,11 +246,11 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
             # XXX TODO this is only going to work if the user has 1 email address in the
             # system and they have nothing that is revoked... uh don't need to solve
             # this right now but will later.
-            id = json.loads(content)["ids"][0]
+            id = json.loads(content.decode("utf8"))["ids"][0]
             content, code = getkey(id)
             if code != 200:
                 return "", code
-            response = json.loads(content)["key"]
+            response = json.loads(content.decode("utf8"))["key"]
         except NoResultFound:
             return "", 404
         else:
