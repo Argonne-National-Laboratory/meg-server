@@ -73,14 +73,9 @@ def put_message(app, db, db_models, celery_tasks):
     if action not in constants.APPROVED_ACTIONS:
         return "", 400
     app.logger.debug("Put new {} message addressed to {} from {}".format(action, email_to, email_from))
-    try:  # Ensure the message is in the right format (not a string)
-        message.decode()
-    except UnicodeDecodeError:
-        new_message = db_models.MessageStore(email_to, email_from, message, action)
-        db.session.add(new_message)
-        db.session.commit()
-    else:
-        return "", 415
+    new_message = db_models.MessageStore(email_to, email_from, message, action)
+    db.session.add(new_message)
+    db.session.commit()
     return send_message_to_phone(app, db, db_models, celery_tasks, action, email_to)
 
 
@@ -238,14 +233,14 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
                strict_slashes=False)
     def get_enc_key_by_message_id():
         """
-        Get the public key of the that encrypted a message
+        Get the public key of the party we want to send an encrypted message to
         """
         try:
             message_id = request.args["associated_message_id"]
             message = db_models.MessageStore.query.filter(
                 db_models.MessageStore.id == message_id
             ).one()
-            content, code = make_get_request(cfg, "search", message.email_from)
+            content, code = make_get_request(cfg, "search", message.email_to)
             if code != 200:
                 return "", code
             # XXX TODO this is only going to work if the user has 1 email address in the
