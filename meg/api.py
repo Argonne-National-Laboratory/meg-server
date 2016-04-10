@@ -31,7 +31,7 @@ def send_message_to_phone(app, db, db_models, celery_tasks, action, email_to):
     except NoResultFound:
         return "", 404
     celery_tasks.transmit_gcm_id.apply_async(
-        (instance_id.instance_id, committed_message.id, "decrypt")
+        (instance_id.instance_id, committed_message.id, committed_message.action)
     )
     return "", 200
 

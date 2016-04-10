@@ -255,6 +255,7 @@ class TestMEGAPI(TestCase):
     def test_put_encrypted_message_success_with_encrypt(self):
         data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": ENCRYPT}
         self.put_encrypted_message_with_gcm_addition(data, 200)
+        self.celery_routes().transmit_gcm_id.apply_async.assert_called_with((GCM_IID, 1, "encrypt"))
 
     def test_put_encrypted_message_error_no_email_from(self):
         """
