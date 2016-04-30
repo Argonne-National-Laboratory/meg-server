@@ -15,27 +15,6 @@ from meg.pgp import store_revocation_cert as backend_cert_storage, verify_trust_
 from meg.skier import make_get_request, make_skier_request
 
 
-def send_message_to_phone(app, db, db_models, celery_tasks, action, email_to):
-    # Query the db for the message id. We do not know it because it is dynamically
-    # allocated
-    committed_message = db_models.MessageStore.query.filter(
-        db_models.MessageStore.email_to == email_to
-    ).order_by(
-        db_models.MessageStore.created_at.desc()
-    ).first()
-    if not committed_message:
-        app.logger.error("Was not able to commit {} message addressed to email {}".format(action, email_to))
-        return "", 500  # this shouldn't happen
-    try:
-        instance_id = db_models.GcmInstanceId.query.filter(db_models.GcmInstanceId.email == email_to).one()
-    except NoResultFound:
-        return "", 404
-    celery_tasks.transmit_gcm_id.apply_async(
-        (instance_id.instance_id, committed_message.id, committed_message.action)
-    )
-    return "", 200
-
-
 def store_message_from_phone(app, db, db_models, request):
     associated_message_id = request.args["associated_message_id"]
     associated_message = db_models.MessageStore.query.filter(db_models.MessageStore.id == int(associated_message_id)).first()
@@ -57,26 +36,59 @@ def store_message_from_phone(app, db, db_models, request):
     return "", 200
 
 
+def send_message_to_phone(app, db, db_models, celery_tasks, action, email_to, email_from):
+    # Query the db for the message id. We do not know it because it is dynamically
+    # allocated
+    committed_message = db_models.MessageStore.query.filter(
+        db_models.MessageStore.email_to == email_to
+    ).order_by(
+        db_models.MessageStore.created_at.desc()
+    ).first()
+    if not committed_message:
+        app.logger.error("Was not able to commit {} message addressed to email {}".format(action, email_to))
+        return "", 500  # this shouldn't happen
+    # XXX The logic is a bit overly complex here. If the message is being encrypted it
+    # is from the originating client. If the message is being decrypted it is from a 3rd party
+    # so the gcm instance id will be associated with email_to. Inevitably we will have bugs here
+    # where a message gets sent to the server but maybe someone hasn't registered yet. So...
+    # must be refactored and redone. This is getting painful
+    if action == "encrypt":
+        user_email = email_from
+    elif action == "decrypt":
+        user_email = email_to
+    try:
+        instance_id = db_models.GcmInstanceId.query.filter(db_models.GcmInstanceId.email == user_email).one()
+    except NoResultFound:
+        return "", 404
+    celery_tasks.transmit_gcm_id.apply_async(
+        (instance_id.instance_id, committed_message.id, committed_message.action)
+    )
+    return "", 200
+
+
 def put_message(app, db, db_models, celery_tasks):
     content_type = request.headers["Content-Type"]
     if not content_type == "application/octet-stream":
         return "", 415
+
     action = request.args['action']  # Can be encrypt, decrypt, or toclient
+    if action not in constants.APPROVED_ACTIONS:
+        return "", 400
+
     if action == "toclient":
         return store_message_from_phone(app, db, db_models, request)
+
     message = request.data
     email_to = request.args['email_to']
     email_from = request.args['email_from']
     app.logger.debug("Put new message in db for {}, from {}, with action {}".format(
         email_to, email_from, action
     ))
-    if action not in constants.APPROVED_ACTIONS:
-        return "", 400
     app.logger.debug("Put new {} message addressed to {} from {}".format(action, email_to, email_from))
     new_message = db_models.MessageStore(email_to, email_from, message, action)
     db.session.add(new_message)
     db.session.commit()
-    return send_message_to_phone(app, db, db_models, celery_tasks, action, email_to)
+    return send_message_to_phone(app, db, db_models, celery_tasks, action, email_to, email_from)
 
 
 def get_message(app, db, db_models):

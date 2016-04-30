@@ -252,11 +252,15 @@ class TestMEGAPI(TestCase):
 
     def test_put_encrypted_message_success_with_decrypt(self):
         data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": DECRYPT}
-        self.put_encrypted_message_with_gcm_addition(data, 200)
+        self.put_encrypted_message_with_gcm_addition(data, 200, EMAIL1)
 
     def test_put_encrypted_message_success_with_encrypt(self):
+        # XXX This test has a weird premise. It wants to encrypt an already encrypted message.
+        # I think this is showing that we have made our logic too complex in the message putter.
+        # So it reminds me we need more error checking to ensure we are not trying to encrypt an
+        # already encrypted email.
         data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": ENCRYPT}
-        self.put_encrypted_message_with_gcm_addition(data, 200)
+        self.put_message_with_gcm_addition(data, 200, "/decrypted_message/", EMAIL2)
         self.celery_routes().transmit_gcm_id.apply_async.assert_called_with((GCM_IID, 1, "encrypt"))
 
     def test_put_encrypted_message_error_no_email_from(self):
@@ -264,11 +268,11 @@ class TestMEGAPI(TestCase):
         Test PUT for /encrypted_message/ by not adding email_from
         """
         data = {"email_to": EMAIL1, "action": DECRYPT, "message": MESSAGE1}
-        self.put_encrypted_message_with_gcm_addition(data, 400)
+        self.put_encrypted_message_with_gcm_addition(data, 400, "")
 
     def test_put_encrypted_message_ensure_we_send_right_one(self):
         data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": DECRYPT}
-        self.put_encrypted_message_with_gcm_addition(data, 200)
+        self.put_encrypted_message_with_gcm_addition(data, 200, EMAIL1)
 
         self.celery_routes().transmit_gcm_id.apply_async.assert_called_with((GCM_IID, 1, "decrypt"))
 
@@ -278,25 +282,44 @@ class TestMEGAPI(TestCase):
 
     def test_put_encrypted_message_error_bad_action(self):
         data = {"email_to": EMAIL1, "action": DECRYPT, "message": MESSAGE1, "action": "blah"}
-        self.put_encrypted_message_with_gcm_addition(data, 400)
+        self.put_encrypted_message_with_gcm_addition(data, 400, "")
 
     def test_put_encrypted_message_without_phone_action(self):
         data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": DECRYPT}
-        self.put_encrypted_message_with_gcm_addition(data, 200)
+        self.put_encrypted_message_with_gcm_addition(data, 200, EMAIL1)
         eq_(self.celery_routes().transmit_gcm_id.apply_async.call_count, 1)
         data = {"associated_message_id": "1", "message": MESSAGE1, "action": TO_CLIENT}
         self.put_encrypted_message(data, 200)
 
-    def put_encrypted_message_with_gcm_addition(self, put_data, expected_code):
-        data = {"gcm_instance_id": GCM_IID, "phone_number": PHONE_NUMBER, "email": EMAIL1}
-        response = self.client.put("/gcm_instance_id/", data=data)
-        self.put_encrypted_message(put_data, expected_code)
+    def put_encrypted_message_with_gcm_addition(self, message_put_data, expected_code, linked_email):
+        """
+        Helper method for setting up a GCM instance id. Mirrors process of a phone registering
+        with the server. Then send an encrypted message to the server.
+        """
+        self.put_message_with_gcm_addition(
+            message_put_data, expected_code, "/encrypted_message/", linked_email
+        )
+
+    def put_message_with_gcm_addition(self, message_put_data, expected_code, uri, linked_email):
+        gcm_data = {
+            "gcm_instance_id": GCM_IID, "phone_number": PHONE_NUMBER, "email": linked_email
+        }
+        response = self.client.put("/gcm_instance_id/", data=gcm_data)
+        self.put_message(message_put_data, expected_code, uri)
 
     def put_encrypted_message(self, put_data, expected_code):
+        """
+        Helper method for putting an encrypted message on the server.
+
+        Not really necessary per se after refactor but keeping around for legacy purpose
+        """
+        self.put_message(put_data, expected_code, "/encrypted_message/")
+
+    def put_message(self, put_data, expected_code, uri):
         file = BytesIO(put_data["message"])
         del put_data["message"]
         response = self.client.put(
-            "/encrypted_message/",
+            uri,
             query_string=put_data,
             input_stream=file,
             headers={"Content-Type": "application/octet-stream"}
@@ -310,7 +333,7 @@ class TestMEGAPI(TestCase):
         Eventually mock the phone calling to grab the message for decryption
         """
         data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": DECRYPT}
-        self.put_encrypted_message_with_gcm_addition(data, 200)
+        self.put_encrypted_message_with_gcm_addition(data, 200, EMAIL1)
         # We're kinda cheating here because we know the id
         response = self.client.get("/encrypted_message/?message_id={}".format(1))
         eq_(response.status_code, 200)
@@ -318,7 +341,7 @@ class TestMEGAPI(TestCase):
 
     def test_get_decrypted_email_to_client(self):
         data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": DECRYPT}
-        self.put_encrypted_message_with_gcm_addition(data, 200)
+        self.put_encrypted_message_with_gcm_addition(data, 200, EMAIL1)
         data = {"associated_message_id": 1, "message": MESSAGE1, "action": TO_CLIENT}
         self.put_encrypted_message(data, 200)
         response = self.client.get("/encrypted_message/?email_from={}&email_to={}".format(EMAIL2, EMAIL1))
@@ -327,19 +350,19 @@ class TestMEGAPI(TestCase):
 
     def test_get_encrypted_message_without_message_id_or_all_email_info1(self):
         data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": DECRYPT}
-        self.put_encrypted_message_with_gcm_addition(data, 200)
+        self.put_encrypted_message_with_gcm_addition(data, 200, EMAIL1)
         response = self.client.get("/encrypted_message/", data={"email_from": EMAIL2})
         eq_(response.status_code, 400)
 
     def test_get_encrypted_message_without_message_id_or_all_email_info2(self):
         data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": DECRYPT}
-        self.put_encrypted_message_with_gcm_addition(data, 200)
+        self.put_encrypted_message_with_gcm_addition(data, 200, EMAIL1)
         response = self.client.get("/encrypted_message/", data={"email_to": EMAIL2})
         eq_(response.status_code, 400)
 
     def test_getkey_by_message_id(self):
         data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": DECRYPT}
-        self.put_encrypted_message_with_gcm_addition(data, 200)
+        self.put_encrypted_message_with_gcm_addition(data, 200, EMAIL1)
         with patch("meg.skier.requests") as mock_requests:
             # invariably we just need the public key... and I'm a little bit too
             # lazy to do this with a side_effect atm
@@ -355,6 +378,7 @@ class TestMEGAPI(TestCase):
             eq_(response.status_code, 404)
 
     def test_getkey_by_message_id_with_side_effect(self):
+        # The ultimate we can do when testing this function.
         def side_effect(arg):
             keyid = "111"
             return {
@@ -363,7 +387,7 @@ class TestMEGAPI(TestCase):
             }[arg]
 
         data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": DECRYPT}
-        self.put_encrypted_message_with_gcm_addition(data, 200)
+        self.put_encrypted_message_with_gcm_addition(data, 200, EMAIL1)
         with patch("meg.skier.requests") as mock_requests:
             mock_requests.get.side_effect = side_effect
             response = self.client.get("/getkey_by_message_id/?associated_message_id=1")
