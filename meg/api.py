@@ -124,6 +124,10 @@ def get_message(app, db, db_models):
             message_id, email_to, email_from)
         )
         return "", 404
+
+    # Remove the object that we just got.
+    db.session.delete(message)
+    db.session.commit()
     return Response(
         BytesIO(message.message),
         headers={"Content-Type": "application/octet-stream"},
