@@ -1,3 +1,4 @@
+from base64 import b64encode
 import binascii
 from io import BytesIO
 import json
@@ -15,21 +16,12 @@ from meg.pgp import store_revocation_cert as backend_cert_storage, verify_trust_
 from meg.skier import make_get_request, make_skier_request
 
 
-def store_message_from_phone(app, db, db_models, request):
-    associated_message_id = request.args["associated_message_id"]
-    associated_message = db_models.MessageStore.query.filter(db_models.MessageStore.id == int(associated_message_id)).first()
-    if not associated_message:  # This is not good in the case of a valid message
-        return "", 404
-    app.logger.debug("Store message for client to: {} from: {} id: {}".format(
-        associated_message.email_to,
-        associated_message.email_from,
-        associated_message_id
+def store_message_from_phone(app, db, db_models, request, email_to, email_from):
+    app.logger.debug("Store message for client to: {} from: {}".format(
+        email_to, email_from
     ))
     new_message = db_models.MessageStore(
-        associated_message.email_to,
-        associated_message.email_from,
-        request.data,
-        request.args["action"]
+        email_to, email_from, request.data, request.args["action"]
     )
     db.session.add(new_message)
     db.session.commit()
@@ -72,15 +64,15 @@ def put_message(app, db, db_models, celery_tasks):
         return "", 415
 
     action = request.args['action']  # Can be encrypt, decrypt, or toclient
+    email_to = request.args['email_to']
+    email_from = request.args['email_from']
     if action not in constants.APPROVED_ACTIONS:
         return "", 400
 
     if action == "toclient":
-        return store_message_from_phone(app, db, db_models, request)
+        return store_message_from_phone(app, db, db_models, request, email_to, email_from)
 
     message = request.data
-    email_to = request.args['email_to']
-    email_from = request.args['email_from']
     app.logger.debug("Put new message in db for {}, from {}, with action {}".format(
         email_to, email_from, action
     ))
@@ -129,7 +121,12 @@ def get_message(app, db, db_models):
     db.session.delete(message)
     db.session.commit()
     return Response(
-        BytesIO(message.message),
+        json.dumps({
+            # TODO I can move from here soon and remove the associated_message API
+            'message': b64encode(message.message).decode("ascii"),
+            'email_to': message.email_to,
+            'email_from': message.email_from,
+        }),
         headers={"Content-Type": "application/octet-stream"},
         status=200
     )

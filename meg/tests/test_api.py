@@ -1,6 +1,7 @@
-import os
+from base64 import b64encode
 from io import BytesIO
 import json
+import os
 from unittest.mock import patch
 
 from flask import Flask
@@ -288,7 +289,7 @@ class TestMEGAPI(TestCase):
         data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": DECRYPT}
         self.put_encrypted_message_with_gcm_addition(data, 200, EMAIL1)
         eq_(self.celery_routes().transmit_gcm_id.apply_async.call_count, 1)
-        data = {"associated_message_id": "1", "message": MESSAGE1, "action": TO_CLIENT}
+        data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": TO_CLIENT}
         self.put_encrypted_message(data, 200)
 
     def put_encrypted_message_with_gcm_addition(self, message_put_data, expected_code, linked_email):
@@ -337,16 +338,26 @@ class TestMEGAPI(TestCase):
         # We're kinda cheating here because we know the id
         response = self.client.get("/encrypted_message/?message_id={}".format(1))
         eq_(response.status_code, 200)
-        eq_(response.data, MESSAGE1)
+        eq_(response.data.decode("ascii"),
+            json.dumps({
+                "message": b64encode(MESSAGE1).decode("ascii"),
+                "email_to": EMAIL1,
+                "email_from": EMAIL2
+            }))
 
     def test_get_decrypted_email_to_client(self):
         data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": DECRYPT}
         self.put_encrypted_message_with_gcm_addition(data, 200, EMAIL1)
-        data = {"associated_message_id": 1, "message": MESSAGE1, "action": TO_CLIENT}
+        data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": TO_CLIENT}
         self.put_encrypted_message(data, 200)
         response = self.client.get("/encrypted_message/?email_from={}&email_to={}".format(EMAIL2, EMAIL1))
         eq_(response.status_code, 200)
-        eq_(response.data, MESSAGE1)
+        eq_(response.data.decode("ascii"),
+            json.dumps({
+                "message": b64encode(MESSAGE1).decode("ascii"),
+                "email_to": EMAIL1,
+                "email_from": EMAIL2,
+            }))
 
     def test_get_encrypted_message_without_message_id_or_all_email_info1(self):
         data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": DECRYPT}
