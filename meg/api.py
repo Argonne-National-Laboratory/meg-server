@@ -60,7 +60,8 @@ def send_message_to_phone(app, db, db_models, celery_tasks, action, email_to, em
 
 def put_message(app, db, db_models, celery_tasks):
     content_type = request.headers["Content-Type"]
-    if not content_type == "application/octet-stream":
+    # Things need to be base64 encoded.
+    if not content_type == "text/plain; charset=us-ascii":
         return "", 415
 
     action = request.args['action']  # Can be encrypt, decrypt, or toclient
@@ -123,7 +124,7 @@ def get_message(app, db, db_models):
     return Response(
         json.dumps({
             # TODO I can move from here soon and remove the associated_message API
-            'message': b64encode(message.message).decode("ascii"),
+            'message': message.message,
             'email_to': message.email_to,
             'email_from': message.email_from,
         }),

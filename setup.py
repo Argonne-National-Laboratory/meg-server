@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from setuptools import setup, find_packages
 
-__version__ = "0.3.14"
+__version__ = "0.4.0"
 
 
 setup(
