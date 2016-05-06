@@ -60,8 +60,9 @@ def send_message_to_phone(app, db, db_models, celery_tasks, action, email_to, em
 
 def put_message(app, db, db_models, celery_tasks):
     content_type = request.headers["Content-Type"]
-    # Things need to be base64 encoded.
-    if not content_type == "text/plain; charset=us-ascii":
+    # Things need to be base64 encoded. I want to demand to demand ascii soon
+    # but must figure out a way to do it.
+    if "text/plain" not in content_type:
         return "", 415
 
     action = request.args['action']  # Can be encrypt, decrypt, or toclient
@@ -74,6 +75,8 @@ def put_message(app, db, db_models, celery_tasks):
         return store_message_from_phone(app, db, db_models, request, email_to, email_from)
 
     message = request.data
+    if isinstance(message, bytes):
+        message = message.decode("ascii")
     app.logger.debug("Put new message in db for {}, from {}, with action {}".format(
         email_to, email_from, action
     ))
