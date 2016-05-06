@@ -16,18 +16,6 @@ from meg.pgp import store_revocation_cert as backend_cert_storage, verify_trust_
 from meg.skier import make_get_request, make_skier_request
 
 
-def store_message_from_phone(app, db, db_models, request, email_to, email_from):
-    app.logger.debug("Store message for client to: {} from: {}".format(
-        email_to, email_from
-    ))
-    new_message = db_models.MessageStore(
-        email_to, email_from, request.data, request.args["action"]
-    )
-    db.session.add(new_message)
-    db.session.commit()
-    return "", 200
-
-
 def send_message_to_phone(app, db, db_models, celery_tasks, action, email_to, email_from):
     # Query the db for the message id. We do not know it because it is dynamically
     # allocated
@@ -60,7 +48,7 @@ def send_message_to_phone(app, db, db_models, celery_tasks, action, email_to, em
 
 def put_message(app, db, db_models, celery_tasks):
     content_type = request.headers["Content-Type"]
-    # Things need to be base64 encoded. I want to demand to demand ascii soon
+    # Things need to be base64 encoded. I want to demand ascii soon
     # but must figure out a way to do it.
     if "text/plain" not in content_type:
         return "", 415
@@ -70,9 +58,6 @@ def put_message(app, db, db_models, celery_tasks):
     email_from = request.args['email_from']
     if action not in constants.APPROVED_ACTIONS:
         return "", 400
-
-    if action == "toclient":
-        return store_message_from_phone(app, db, db_models, request, email_to, email_from)
 
     message = request.data
     if isinstance(message, bytes):
@@ -84,7 +69,10 @@ def put_message(app, db, db_models, celery_tasks):
     new_message = db_models.MessageStore(email_to, email_from, message, action)
     db.session.add(new_message)
     db.session.commit()
-    return send_message_to_phone(app, db, db_models, celery_tasks, action, email_to, email_from)
+    if action != "toclient":
+        return send_message_to_phone(app, db, db_models, celery_tasks, action, email_to, email_from)
+    else:
+        return "", 200
 
 
 def get_message(app, db, db_models):
