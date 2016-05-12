@@ -32,7 +32,7 @@ def create_celery_routes(celery, cfg):
     @celery.task(max_retries=cfg.config.celery.remove_key_data.retries)
     def remove_key_data(gcm_iid):
         gcm = GCM(cfg.config.gcm_api_key)
-        data = {"revoke_all": True}
+        data = {"action": "revoke"}
         response = gcm.json_request(registration_ids=[gcm_iid], data=data)
         if 'errors' in response:
             remove_key_data.retry(
