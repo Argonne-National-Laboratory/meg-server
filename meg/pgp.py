@@ -5,7 +5,7 @@ meg.pgp
 Perform pgp related actions here
 """
 from pgpdump import AsciiData
-from pgpdump.packet import SignaturePacket
+from pgpdump.packet import SignaturePacket, UserIDPacket
 from pgpdump.utils import PgpdumpException
 from sqlalchemy import and_
 from sqlalchemy.orm.exc import NoResultFound
@@ -14,8 +14,7 @@ from meg.exception import BadRevocationKeyException
 from meg.skier import get_all_key_signatures, make_get_request
 
 
-def store_revocation_cert(db, armored_key, RevocationKey):
-    # First be able to ensure we can add an extra newline on the fly.
+def get_pgp_key_data(armored_key):
     try:
         ascii_data = AsciiData(armored_key.encode())
     except PgpdumpException as err:
@@ -27,19 +26,41 @@ def store_revocation_cert(db, armored_key, RevocationKey):
             ascii_data = AsciiData(new_armored_key.encode())
         else:
             raise err
+    return ascii_data
 
+
+def get_revocation_signature_packet(ascii_data):
+    for packet in ascii_data.packets():
+        if isinstance(packet, SignaturePacket):
+            if packet.sig_type == "Key revocation signature":
+                return packet
+    else:
+        raise BadRevocationKeyException("No signature packet found")
+
+
+def get_user_id_packet(ascii_data):
+    for packet in ascii_data.packets():
+        if isinstance(packet, UserIDPacket):
+            return packet
+    else:
+        raise BadRevocationKeyException("No user id packet found")
+
+
+def get_user_email_from_key(armored_key):
+    ascii_data = get_pgp_key_data(armored_key)
+    uid_packet = get_user_id_packet(ascii_data)
+    return uid_packet.user_email
+
+
+def store_revocation_cert(db, armored_key, RevocationKey):
+    # First be able to ensure we can add an extra newline on the fly.
+    ascii_data = get_pgp_key_data(armored_key)
     packets = list(ascii_data.packets())
 
     if len(packets) == 0:
         raise BadRevocationKeyException("No packets found")
 
-    for packet in packets:
-        if isinstance(packet, SignaturePacket):
-            if packet.sig_type == "Key revocation signature":
-                signature = packet
-                break
-    else:
-        raise BadRevocationKeyException("No signature packet found")
+    signature = get_revocation_signature_packet(ascii_data)
 
     created = signature.creation_time
     expires = signature.expiration_time

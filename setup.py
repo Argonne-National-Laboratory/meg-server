@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from setuptools import setup, find_packages
 
-__version__ = "0.4.3"
+__version__ = "0.5.0"
 
 
 setup(
@@ -22,6 +22,7 @@ setup(
         "python-gcm==0.4",
         "PyYAML>=3.11",
         "requests==2.9.1",
+        "sendgrid==2.2.1",
     ],
     entry_points={
         "console_scripts": [

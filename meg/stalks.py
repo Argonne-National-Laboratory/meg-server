@@ -29,5 +29,15 @@ def create_celery_routes(celery, cfg):
         else:
             logger.debug("Message transmitted successfully response: {}".format(response))
 
+    @celery.task(max_retries=cfg.config.celery.remove_key_data.retries)
+    def remove_key_data(gcm_iid):
+        gcm = GCM(cfg.config.gcm_api_key)
+        data = {"revoke_all": True}
+        response = gcm.json_request(registration_ids=[gcm_iid], data=data)
+        if 'errors' in response:
+            remove_key_data.retry(
+                args=[gcm_iid], countdown=cfg.config.celery.remove_key_data.timeout
+            )
+
     CeleryTasks = namedtuple('CeleryTasks', ['transmit_gcm_id'])
     return CeleryTasks(transmit_gcm_id)

@@ -2,6 +2,8 @@ from base64 import b64encode
 import binascii
 from io import BytesIO
 import json
+import time
+from uuid import uuid4
 from urllib.parse import urlencode
 
 from flask import request, Response
@@ -11,8 +13,11 @@ from sqlalchemy.orm import load_only
 from sqlalchemy.orm.exc import NoResultFound
 
 from meg import constants
+from meg.email import send_revocation_request_email
 from meg.exception import BadRevocationKeyException
-from meg.pgp import store_revocation_cert as backend_cert_storage, verify_trust_level
+from meg.pgp import (
+    get_user_email_from_key, store_revocation_cert as backend_cert_storage, verify_trust_level
+)
 from meg.skier import make_get_request, make_skier_request
 
 
@@ -26,7 +31,8 @@ def send_message_to_phone(app, db, db_models, celery_tasks, action, email_to, em
     ).first()
     if not committed_message:
         app.logger.error("Was not able to commit {} message addressed to email {}".format(action, email_to))
-        return "", 500  # this shouldn't happen
+        return "", 500  # this shouldn't happen. (But saying this is asking for it to happen)
+
     # XXX The logic is a bit overly complex here. If the message is being encrypted it
     # is from the originating client. If the message is being decrypted it is from a 3rd party
     # so the gcm instance id will be associated with email_to. Inevitably we will have bugs here
@@ -128,6 +134,7 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
 
     RevocationKey = db_models.RevocationKey
     GcmInstanceId = db_models.GcmInstanceId
+    RevocationToken = db_models.RevocationToken
 
     @app.route("{}/addkey".format(cfg.config.meg_url_prefix), methods=["PUT"], strict_slashes=False)
     def addkey():
@@ -155,7 +162,6 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         1: can be verified through web of trust
         2: untrusted
         """
-        # XXX TODO Error checking
         app.logger.debug("Get trust level for origin: {} contact: {}".format(origin_keyid, contact_keyid))
         return str(verify_trust_level(cfg, origin_keyid, contact_keyid)), 200
 
@@ -175,19 +181,30 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
             return err.args[0], 400
         return "Success", 200
 
-    # XXX TODO This needs authentication otherwise everyones certificates
-    # could be revoked at will
-    #
-    # Also this api route should be combined with above. It should just be
-    # revocation_cert. The method should also change here to DELETE
-    @app.route("{}/revoke_certificate/<keyid>".format(cfg.config.meg_url_prefix),
-               methods=["POST"],
+    @app.route("{}/revoke/".format(cfg.config.meg_url_prefix),
+               methods=["GET"],
                strict_slashes=False)
-    def revoke_certificate(keyid):
+    def revoke_certificate():
         """
         Revoke a users public key certificate
         """
-        # XXX TODO Error handling
+        keyid = request.args["keyid"]
+        auth_token = request.args["token"]
+        token_result = RevocationToken.query.filter(
+            RevocationToken.pgp_keyid_for == keyid
+        ).order_by(RevocationToken.created_at.desc())
+
+        # TODO We need to clean up old revocation requests in the DB
+        token_row = token_result.first()
+        if not token_row:
+            return "", 404
+        if auth_token != token_row.hex:
+            return "", 401
+        db.session.delete(token_row)
+        db.session.commit()
+        if time.time() - int(token_row.created_at.strftime("%s")) > cfg.config.revocation.ttl:
+            return "It has been longer than 1 hour since this request was first triggered. Please make a new request to revoke from the phone", 401
+
         try:
             app.logger.warn("Revoke certificate for key: {}".format(keyid))
             result = RevocationKey.query.options(load_only("armored")).filter(
@@ -195,17 +212,46 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
             )
             armored = result.distinct().one().armored
         except NoResultFound:
-            return "Not Found", 404
+            return "Key {} not found".format(keyid), 404
         # XXX This makes me ask the question. If we revoke a key but then
         # send the unrevoked public key back to skier does Skier handle our
         # certificate as non-revoked again?
-        return make_skier_request(
+        content, code = make_skier_request(
             cfg, requests.post, "addkey?{}".format(urlencode({"keydata": armored}))
         )
+        if code != 200:
+            return "We were unable to revoke the token. Please try restarting the revocation process", code
 
-    # XXX Search is pretty weak right now on Skier. We might not be able
-    # to find keys by email address which is a pretty big deal for us.
-    # So lets look into this eventually and figure it out.
+        try:
+            instance_id = db_models.GcmInstanceId.query.filter(
+                db_models.GcmInstanceId.email == token_row.user_email
+            ).one()
+        except NoResultFound:
+            return "", 404
+        celery_tasks.remove_key_data.apply_async((instance_id.instance_id))
+        return "", 200
+
+    @app.route("{}/request_revoke/".format(cfg.config.meg_url_prefix),
+               methods=["POST"],
+               strict_slashes=False)
+    def request_revocation():
+        """
+        Send a revocation request to the users email address.
+        """
+        keyid = request.args["keyid"]
+        if len(keyid) != 8:
+            return "", 400
+        content, code = getkey(keyid)
+        if code != 200:
+            return content, code
+        hex = uuid4().hex
+        user_email = get_user_email_from_key(json.loads(content.decode("utf8"))["key"])
+        revocation = RevocationToken(keyid, hex, user_email)
+        db.session.add(revocation)
+        db.session.commit()
+        content, code = send_revocation_request_email(cfg, keyid, hex, user_email)
+        return content, code
+
     @app.route("{}/search/<search_str>".format(cfg.config.meg_url_prefix),
                methods=["GET"])
     def search(search_str):
@@ -248,9 +294,6 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
             content, code = make_get_request(cfg, "search", message.email_to)
             if code != 200:
                 return "", code
-            # XXX TODO this is only going to work if the user has 1 email address in the
-            # system and they have nothing that is revoked... uh don't need to solve
-            # this right now but will later.
             id = json.loads(content.decode("utf8"))["ids"][0]
             content, code = getkey(id)
             if code != 200:

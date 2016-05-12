@@ -1,4 +1,8 @@
 celery:
+  remove_key_data:
+    retries: 10
+    timeout: 5
+
   transmit_gcm_id:
     retries: 10
     timeout: 5
@@ -42,4 +46,17 @@ logging:
 
 meg_url_prefix: ""
 
-wot_bfs_max_depth: 5
+# The hostname we will call meg at
+megserver_hostname_url: http://localhost
+
+revocation:
+  ttl: 360
+
+# User will need to fill this in themselves
+sendgrid:
+  api_key: XXX
+  from_email: noreply@meg.com
+  subject: MEG Key Revocation Confirmation
+
+# Something something 6 degress of separation
+wot_bfs_max_depth: 6

@@ -63,5 +63,23 @@ def generate_models(db):
             self.message = message
             self.created_at = datetime.datetime.now()
 
-    Models = namedtuple('Models', ['RevocationKey', 'GcmInstanceId', 'MessageStore'])
-    return Models(RevocationKey, GcmInstanceId, MessageStore)
+    class RevocationToken(db.Model):
+        """
+        Stores revocation tokens.
+        """
+        id = db.Column(db.Integer, primary_key=True)
+        pgp_keyid_for = db.Column(db.VARCHAR(8), nullable=False)
+        hex = db.Column(db.VARCHAR(32), nullable=False)
+        created_at = db.Column(db.DateTime, nullable=False)
+        user_email = db.Column(db.Text, nullable=False)
+
+        def __init__(self, keyid, hex, user_email):
+            self.pgp_keyid_for = keyid
+            self.hex = hex
+            self.user_email = user_email
+            self.created_at = datetime.datetime.now()
+
+    Models = namedtuple('Models', [
+        'RevocationKey', 'GcmInstanceId', 'MessageStore', 'RevocationToken'
+    ])
+    return Models(RevocationKey, GcmInstanceId, MessageStore, RevocationToken)
