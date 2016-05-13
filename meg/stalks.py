@@ -39,5 +39,5 @@ def create_celery_routes(celery, cfg):
                 args=[gcm_iid], countdown=cfg.config.celery.remove_key_data.timeout
             )
 
-    CeleryTasks = namedtuple('CeleryTasks', ['transmit_gcm_id'])
-    return CeleryTasks(transmit_gcm_id)
+    CeleryTasks = namedtuple('CeleryTasks', ['transmit_gcm_id', 'remove_key_data'])
+    return CeleryTasks(transmit_gcm_id, remove_key_data)

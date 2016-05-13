@@ -136,13 +136,16 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
     GcmInstanceId = db_models.GcmInstanceId
     RevocationToken = db_models.RevocationToken
 
-    @app.route("{}/addkey".format(cfg.config.meg_url_prefix), methods=["PUT"], strict_slashes=False)
-    def addkey():
-        armored = request.form["keydata"]
+    def _addkey(armored):
         app.logger.debug("Attempt to add key: {}".format(armored))
         return make_skier_request(
             cfg, requests.post, "addkey?{}".format(urlencode({"keydata": armored}))
         )
+
+    @app.route("{}/addkey".format(cfg.config.meg_url_prefix), methods=["PUT"], strict_slashes=False)
+    def addkey():
+        armored = request.form["keydata"]
+        return _addkey(armored)
 
     @app.route("{}/getkey/<keyid>".format(cfg.config.meg_url_prefix),
                methods=["GET"],
@@ -216,9 +219,9 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         # XXX This makes me ask the question. If we revoke a key but then
         # send the unrevoked public key back to skier does Skier handle our
         # certificate as non-revoked again?
-        content, code = make_skier_request(
-            cfg, requests.post, "addkey?{}".format(urlencode({"keydata": armored}))
-        )
+        #
+        # XXX This doesnt actually seem to be working. We need to test this.
+        content, code = _addkey(armored)
         if code != 200:
             return "We were unable to revoke the token. Please try restarting the revocation process", code
 
@@ -228,7 +231,7 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
             ).one()
         except NoResultFound:
             return "", 404
-        celery_tasks.remove_key_data.apply_async((instance_id.instance_id))
+        celery_tasks.remove_key_data.apply_async((instance_id.instance_id,))
         return "", 200
 
     @app.route("{}/request_revoke/".format(cfg.config.meg_url_prefix),

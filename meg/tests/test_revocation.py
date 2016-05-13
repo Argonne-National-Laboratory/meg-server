@@ -5,6 +5,7 @@ from nose.tools import eq_
 
 from meg.app import create_app as make_app
 from meg.cfg import configure_app
+from meg.constants import EMAIL_HTML
 
 EMAIL1 = "foo@bar.com"
 GCM_IID = "foobar"
@@ -64,11 +65,11 @@ class MockResponse(object):
 
 class TestMEGRevocationAPI(TestCase):
     def create_app(self):
-        with patch("meg.app.create_celery_routes") as celery_routes:
-            self.celery_routes = celery_routes
-            app, self.db, self.models, _ = make_app(debug=True, testing=True)
-            self.cfg, _ = configure_app(app, True, True)
-            return app
+        #with patch("meg.app.create_celery_routes") as celery_routes:
+        #self.celery_routes = celery_routes
+        app, self.db, self.models, self.celery_routes = make_app(debug=True, testing=True)
+        self.cfg, _ = configure_app(app, True, True)
+        return app
 
     def tearDown(self):
         self.db.session.remove()
@@ -127,6 +128,18 @@ class TestMEGRevocationAPI(TestCase):
         response = self.perform_request_revocation()
         eq_(response.status_code, 200)
         eq_(response.data.decode("ascii"), "huzzah")
+
+    def test_request_revocation_for_email_correctness(self):
+        with patch("meg.email.Mail") as mock_mail:
+            with patch("meg.api.uuid4") as mock_uuid:
+                mock_uuid().hex = TOKEN
+                response = self.perform_request_revocation()
+                mock_mail().set_html.assert_called_with(EMAIL_HTML.format(
+                    keyid=REVOCATION_ID,
+                    link="http://localhost/revoke?keyid={}&token={}".format(
+                        REVOCATION_ID, TOKEN
+                    )
+                ))
 
     def test_revoke_with_incorrect_token(self):
         self.perform_request_revocation()
