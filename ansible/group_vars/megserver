@@ -4,6 +4,9 @@ megserver_version: 0.5.1
 megserver_gunicorn_bind_addr: unix:/var/tmp/megserver.sock
 
 nginx_default_enable: false
+nginx_client_body_buffer_size: 4k
+nginx_client_header_buffer_size: 4k
+nginx_large_client_header_buffers: 2 1k
 
 openssl_version: 1.0.2g
 
