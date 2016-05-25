@@ -87,11 +87,11 @@ Get a message (that is encrypted by AES symmetric key) that is PGP decrypted. Th
 
 1. Get a message by message id. This is used by the phone
 
-    GET /decrypted_message/?message_id=<message id>
+    `GET /decrypted_message/?message_id=<message id>`
 
 2. Get a message by to and from email address
 
-    GET /decrypted_message/?email\_to=<recipient email address>&email\_from=<origin email address>
+    `GET /decrypted_message/?email_to=<recipient email address>&email_from=<origin email address>`
 
 Put a PGP decrypted email on the server. The message must be base64 encoded.
 
@@ -113,11 +113,11 @@ Get a message that is PGP encrypted from the server. The methods here are almost
 
 1. Get a message by message id. This is used by the phone
 
-    GET /encrypted_message/?message_id=<message id>
+    `GET /encrypted_message/?message_id=<message id>`
 
 2. Get a message by to and from email address
 
-    GET /encrypted_message/?email\_to=<recipient email address>&email\_from=<origin email address>
+    `GET /encrypted_message/?email\_to=<recipient email address>&email_from=<origin email address>`
 
 Put a PGP encrypted email on the server. The message must be base64 encoded
 
@@ -125,7 +125,7 @@ Put a PGP encrypted email on the server. The message must be base64 encoded
     Content-Type: text/plain
 
     data:
-    <base 64 encoded message>
+    <base64 encoded message>
 
 ## Acknowledgements
 To SunDwarf's work done on Skier that serves as a basis and inspiration for
