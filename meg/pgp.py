@@ -11,7 +11,7 @@ from sqlalchemy import and_
 from sqlalchemy.orm.exc import NoResultFound
 
 from meg.exception import BadRevocationKeyException
-from meg.skier import get_all_key_signatures, make_get_request
+from meg.sks import get_all_key_signatures
 
 
 def get_pgp_key_data(armored_key):

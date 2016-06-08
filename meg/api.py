@@ -1,6 +1,5 @@
 from base64 import b64encode
 import binascii
-from io import BytesIO
 import json
 import time
 from uuid import uuid4
@@ -16,9 +15,11 @@ from meg import constants
 from meg.email import send_revocation_request_email
 from meg.exception import BadRevocationKeyException
 from meg.pgp import (
-    get_user_email_from_key, store_revocation_cert as backend_cert_storage, verify_trust_level
+    get_user_email_from_key,
+    store_revocation_cert as backend_cert_storage,
+    verify_trust_level
 )
-from meg.skier import make_get_request, make_skier_request
+from meg.sks import addkey_to_sks, get_key_by_id, search_key
 
 
 def send_message_to_phone(app, db, db_models, celery_tasks, action, email_to, email_from):
@@ -31,7 +32,8 @@ def send_message_to_phone(app, db, db_models, celery_tasks, action, email_to, em
     ).first()
     if not committed_message:
         app.logger.error("Was not able to commit {} message addressed to email {}".format(action, email_to))
-        return "", 500  # this shouldn't happen. (But saying this is asking for it to happen)
+        # this shouldn't happen. (But saying this is asking for it to happen)
+        return "", 500
 
     # XXX The logic is a bit overly complex here. If the message is being encrypted it
     # is from the originating client. If the message is being decrypted it is from a 3rd party
@@ -138,9 +140,7 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
 
     def _addkey(armored):
         app.logger.debug("Attempt to add key: {}".format(armored))
-        return make_skier_request(
-            cfg, requests.post, "addkey?{}".format(urlencode({"keydata": armored}))
-        )
+        return addkey_to_sks(cfg, armored)
 
     @app.route("{}/addkey".format(cfg.config.meg_url_prefix), methods=["PUT"], strict_slashes=False)
     def addkey():
@@ -151,7 +151,7 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
                methods=["GET"],
                strict_slashes=False)
     def getkey(keyid):
-        return make_get_request(cfg, "getkey", keyid)
+        return get_key_by_id(cfg, keyid)
 
     @app.route("{}/get_trust_level/<origin_keyid>/<contact_keyid>".
                format(cfg.config.meg_url_prefix),
@@ -216,11 +216,6 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
             armored = result.distinct().one().armored
         except NoResultFound:
             return "Key {} not found".format(keyid), 404
-        # XXX This makes me ask the question. If we revoke a key but then
-        # send the unrevoked public key back to skier does Skier handle our
-        # certificate as non-revoked again?
-        #
-        # XXX This doesnt actually seem to be working. We need to test this.
         content, code = _addkey(armored)
         if code != 200:
             return "We were unable to revoke the token. Please try restarting the revocation process", code
@@ -248,7 +243,7 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         if code != 200:
             return content, code
         hex = uuid4().hex
-        user_email = get_user_email_from_key(json.loads(content.decode("utf8"))["key"])
+        user_email = get_user_email_from_key(content)
         revocation = RevocationToken(keyid, hex, user_email)
         db.session.add(revocation)
         db.session.commit()
@@ -258,7 +253,10 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
     @app.route("{}/search/<search_str>".format(cfg.config.meg_url_prefix),
                methods=["GET"])
     def search(search_str):
-        return make_get_request(cfg, "search", search_str)
+        content, status_code = search_key(cfg, search_str)
+        if status_code != 200:
+            return content, status_code
+        return json.dumps(content), status_code
 
     # XXX This method probably needs some kind of authentication other
     # it would be pretty trivial to perform a denial of service on MEG
@@ -294,18 +292,17 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
             message = db_models.MessageStore.query.filter(
                 db_models.MessageStore.id == message_id
             ).one()
-            content, code = make_get_request(cfg, "search", message.email_to)
+            content, code = search_key(cfg, message.email_to)
             if code != 200:
                 return "", code
-            id = json.loads(content.decode("utf8"))["ids"][0]
+            id = content["ids"][0]
             content, code = getkey(id)
             if code != 200:
                 return "", code
-            response = json.loads(content.decode("utf8"))["key"]
         except NoResultFound:
             return "", 404
         else:
-            return Response(response, content_type="text/html; charset=ascii", status=200)
+            return Response(content, content_type="text/html; charset=ascii", status=200)
 
     @app.route("{}/decrypted_message/".format(cfg.config.meg_url_prefix),
                methods=["GET"],

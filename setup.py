@@ -12,6 +12,7 @@ setup(
     packages=find_packages(exclude=["*.tests"]),
     data_files=[('config', ['meg/config.default.yml'])],
     install_requires=[
+        "beautifulsoup4==4.4.1",
         "celery==3.1.22",
         "configmaster>=2.3.6",
         "Flask>=0.10.1",

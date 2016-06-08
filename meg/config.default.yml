@@ -18,7 +18,7 @@ db:
 gcm_api_key: ""
 
 keyservers:
-  - http://localhost:5000
+  - http://localhost:11371/pks
 
 logging:
   version: 1
