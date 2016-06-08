@@ -53,16 +53,6 @@ t8LdAeusaEu+31ZK5/lOhxQnQlnKzsDi
 TOKEN = "0x123"
 
 
-class MockResponse(object):
-    def __init__(self, status_code, content):
-        self.status_code = status_code
-        self.content = content
-
-    def json():
-        # Hopefully we provided our content as a dictionary
-        return content
-
-
 class TestMEGRevocationAPI(TestCase):
     def create_app(self):
         #with patch("meg.app.create_celery_routes") as celery_routes:
@@ -148,9 +138,9 @@ class TestMEGRevocationAPI(TestCase):
 
     def test_revoke_success(self):
         self.perform_request_revocation()
-        with patch("meg.api.requests") as mock_requests:
+        with patch("meg.api.addkey_to_sks") as mock_add:
             with patch("meg.stalks.GCM") as mock_gcm:
-                mock_requests.post.return_value = MockResponse(200, "")
+                mock_add.return_value = "", 200
                 token_result = self.models.RevocationToken.query.filter(
                     self.models.RevocationToken.pgp_keyid_for == REVOCATION_ID
                 ).one()

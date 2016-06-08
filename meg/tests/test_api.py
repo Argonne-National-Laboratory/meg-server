@@ -92,7 +92,7 @@ class TestMEGAPI(TestCase):
             eq_(response.status_code, 200)
 
     def test_getkey(self):
-        with patch("meg.skier.requests") as mock_requests:
+        with patch("meg.sks.requests") as mock_requests:
             mock_requests.get.return_value = MockResponse(200, PUB_KEY)
             response = self.client.get("/getkey/11111A")
             eq_(response.data.decode(), PUB_KEY)
@@ -105,7 +105,7 @@ class TestMEGAPI(TestCase):
             )
         }
         side_effect = lambda a: web[a]
-        with patch("meg.skier.requests") as mock_requests:
+        with patch("meg.sks.requests") as mock_requests:
             mock_requests.get.side_effect = side_effect
             response = self.client.get("/get_trust_level/1111A/1111B")
             eq_(response.status_code, 200)
@@ -121,7 +121,7 @@ class TestMEGAPI(TestCase):
             )
         }
         side_effect = lambda a: web[a]
-        with patch("meg.skier.requests") as mock_requests:
+        with patch("meg.sks.requests") as mock_requests:
             mock_requests.get.side_effect = side_effect
             response = self.client.get("/get_trust_level/1111A/1111B")
             eq_(response.status_code, 200)
@@ -279,7 +279,7 @@ class TestMEGAPI(TestCase):
     def test_getkey_by_message_id(self):
         data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": DECRYPT}
         self.put_encrypted_message_with_gcm_addition(data, 200, EMAIL1)
-        with patch("meg.skier.requests") as mock_requests:
+        with patch("meg.sks.requests") as mock_requests:
             # invariably we just need the public key... and I'm a little bit too
             # lazy to do this with a side_effect atm
             mock_requests.get.return_value = MockResponse(200, bytes(json.dumps({"key": PUB_KEY, "ids": ["1234"]}), "utf8"))
@@ -288,7 +288,7 @@ class TestMEGAPI(TestCase):
             eq_(response.data, bytes(PUB_KEY, "ascii"))
 
     def test_getkey_by_message_id_err_no_msg(self):
-        with patch("meg.skier.requests") as mock_requests:
+        with patch("meg.sks.requests") as mock_requests:
             mock_requests.get.return_value = MockResponse(200, json.dumps({"key": PUB_KEY, "ids": ["1234"]}))
             response = self.client.get("/getkey_by_message_id/?associated_message_id=1")
             eq_(response.status_code, 404)
@@ -304,7 +304,7 @@ class TestMEGAPI(TestCase):
 
         data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": DECRYPT}
         self.put_encrypted_message_with_gcm_addition(data, 200, EMAIL1)
-        with patch("meg.skier.requests") as mock_requests:
+        with patch("meg.sks.requests") as mock_requests:
             mock_requests.get.side_effect = side_effect
             response = self.client.get("/getkey_by_message_id/?associated_message_id=1")
             eq_(response.status_code, 200)

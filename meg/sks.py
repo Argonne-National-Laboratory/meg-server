@@ -56,7 +56,7 @@ def search_key(cfg, search_str):
     )
     if status_code != 200:
         return content, status_code
-    bs = BeautifulSoup(r.content)
+    bs = BeautifulSoup(content)
     ids = [a.text for a in bs.findAll("a") if "op=get" in a["href"]]
     return {"ids": ids}
 
@@ -70,7 +70,7 @@ def get_key_by_id(cfg, keyid):
     )
     if status_code != 200:
         return content, status_code
-    return BeautifulSoup(content).pre.text, status_code
+    return {"key": BeautifulSoup(content).pre.text}, status_code
 
 
 def addkey_to_sks(cfg, keytext):
