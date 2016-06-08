@@ -168,8 +168,8 @@ class TestMEGRevocationAPI(TestCase):
 
     def perform_request_revocation(self):
         self.test_revocation_storage1()
-        mock_content = '{"key": "BLAH"}'.encode("utf8")
-        with patch("meg.api.make_get_request") as mock_requests:
+        mock_content = {"key": "BLAH"}
+        with patch("meg.api.get_key_by_id") as mock_requests:
             mock_requests.return_value = mock_content, 200
             with patch("meg.api.get_user_email_from_key") as mock_get_email:
                 with patch("meg.email.SendGridClient") as mock_email_client:

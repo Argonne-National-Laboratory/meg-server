@@ -151,7 +151,8 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
                methods=["GET"],
                strict_slashes=False)
     def getkey(keyid):
-        return get_key_by_id(cfg, keyid)
+        content, status_code = get_key_by_id(cfg, keyid)
+        return Response(json.dumps(content), content_type="application/json", status=status_code)
 
     @app.route("{}/get_trust_level/<origin_keyid>/<contact_keyid>".
                format(cfg.config.meg_url_prefix),
@@ -216,7 +217,7 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
             armored = result.distinct().one().armored
         except NoResultFound:
             return "Key {} not found".format(keyid), 404
-        content, code = _addkey(armored)
+        _, code = _addkey(armored)
         if code != 200:
             return "We were unable to revoke the token. Please try restarting the revocation process", code
 
@@ -239,11 +240,11 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         keyid = request.args["keyid"]
         if len(keyid) != 8:
             return "", 400
-        content, code = getkey(keyid)
+        content, code = get_key_by_id(cfg, keyid)
         if code != 200:
             return content, code
         hex = uuid4().hex
-        user_email = get_user_email_from_key(content)
+        user_email = get_user_email_from_key(content['key'])
         revocation = RevocationToken(keyid, hex, user_email)
         db.session.add(revocation)
         db.session.commit()
@@ -296,13 +297,13 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
             if code != 200:
                 return "", code
             id = content["ids"][0]
-            content, code = getkey(id)
+            content, code = get_key_by_id(cfg, id)
             if code != 200:
                 return "", code
         except NoResultFound:
             return "", 404
         else:
-            return Response(content, content_type="text/html; charset=ascii", status=200)
+            return Response(content['key'], content_type="text/html; charset=ascii", status=200)
 
     @app.route("{}/decrypted_message/".format(cfg.config.meg_url_prefix),
                methods=["GET"],
