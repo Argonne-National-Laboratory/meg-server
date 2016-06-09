@@ -17,6 +17,7 @@ EMAIL1 = "foo@bar.com"
 EMAIL2 = "bin@baz.org"
 ENCRYPT = "encrypt"
 GCM_IID = "foobar"
+KEY_ID = "ABCD1234"
 MESSAGE1 = b64encode(b'\x85\x01\x0c\x03\xd3\xd6\x13o0\x01-=\x01\x07\xffN\xb7Q\x0e \x9cZx\xc6\xb4f$\xf9\xd8\xf5\xff\xc2a\xc9\xad5\xdbu.Ri\xf9E\x10\xcf\xc2\xf8\xe4b\xe9\x16\xcf\x1f\xf5\xfe\xf8\xda\x8f\xeb\xaf\xd2;\x1dx\x8a\xc3\x0bz\x93\xdc=\xa0\x8d! \xf8\xf3\x92\x83 \xa9\xd3t\xf3\x81\x8e\x1e!\xb8\xafRB{6\x18\x83{\x8b\xe6*\xac\xd373\x93\x1f/a|\xb4A\xccodO\xff\x80\r\xa4\xa0#\x84q\x0fn\xcd\x04\x82j\xa0\xee\xb8Z\xfe\xda\xb5E\xf9\x95\x19iI|\x14+4F\xa5\xa8\xae\xa9\n"$q\xdb\x97j\'V\xb3s\x1aE\xb1\x04\xda\xf9]hI\x85\xe4\xc4ao\x99\xc8ZA\xd5\x88\xbf\xe8\xd0\x1d\xd9&\x1e\xb8\xec\x85;\xc0OlA\xd02\xd3\xd6\xfc\x07\xf4m\x1a\x0c\x1c\xde\xa2\xc6 \x0cOMkA\x9dF\x9d*\x9e\xd7\x8c\xeb\x9a\xdb\x81p\xa6\xecF\x9eo!\\\x10\xd1\xdd1{\xa6G\xfd\xcc\x10\xe7P\xde4\xe9Id9\xa3\xf5\x0cl\xe6\x8c4\x9aN+fn\x14\xa9M\xfe\xda\xc9)\x9e#[\xa3\xf2\x90\xa6K\xfa3|\x8d#\xf2\xec\x004?\xcd\xce\xd5:\xda\x94\xf6\xc8\xda\x81y\xfaB<\xc0a,a\xabe\xe8\x95\x08').decode("ascii")
 MESSAGE2 = b64encode(b'\x85\x01\x0c\x03\xd3\xd6\x13o0\x01-=\x01\x07\xff\x7f<\xcbg\x94&q8\xff\xf0\xe6\xb7j\xd6\xde~\xcdWG\x08>\xfa\xb9:\x13\x86\x91\x1c\x7f\xf4\x06\xe8\x01dP\x1a4\xf1\x85G\x8c\xdd\xdc\xdaX\x1d\x8d\x13\xd2d\x1f\xfc&\x1f\xec\x88\xd5\xcf\x142\x0b2\xb4\xe3PFHR`qQ\x1d\xa4\xf5\xddp\x10\xd1\xfc\x06@\xe6<\xc0\x11\xe6+\xe4\xaeJ\xf6D\x90\xa1\x15U\xda\xaa\xed\xac,{\x16\xe2\xdd\x9bt\t\x8ef\xe2c\x1c*E\xf1gO.\xfbw\xf187\t2\x9b\xe8\x1e\x7f8\x16\xc1w\x1c\x17\xe6\x0bri\xe9\xab\x83\xb9)\\\xcf5\xa9A\xa0\xd3G\xb3.\xe8G\xd9\xfe:\x8f\xe0\x1e\xcb\x15\xd1%\xc7\x07\x87 \x94\xd6\x8dmWT\xce\xfc\xc4\xd7}4\xbfB\x8dN\xf2\x85\xd8`\x87/Y\x06?\xbec\xfa*\xe6@\x9f\xd5\x83\x85\xd9\x98\xb0\x120h\xa2\xfd\xa6\xc9\xca\xd4!\xebj\xc3B\xc1\xbdo\\\xd4\xb4\xa05`\xb2\xfc\xa0\xa7*Q\xa6,Z@L`\xb6]&\xa4Q\xca\xa5\x1d\xd9E\xa4\x98\xc9"\x18e\x97]\x95\xc6\x14\xea\xbc|n}\xee-\x8e\x1aq4\x1fT\xb1\xcea\xdd\xbf\x7f\xdc\xb8\xf2\x80\x00\xda\x1f[').decode("ascii")
 PHONE_NUMBER = "5551112222"
@@ -57,7 +58,41 @@ rNnPlxjZO94NKyCKfw2yreGwYzzhueKd3IHJkKNjUjXUuVbelVYlLjA2mS53t0IB
 FzCQNmQ1
 =3GLU
 -----END PGP PUBLIC KEY BLOCK-----"""
-
+PUB_KEY_HTML = """
+<?xml version='1.0' encoding='utf-8'?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd" >
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>Public Key Server -- Get "0x86e4c4856e2d5148 "</title>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<style type="text/css">
+/*<![CDATA[*/
+ .uid {{ color: green; text-decoration: underline; }}
+ .warn {{ color: red; font-weight: bold; }}
+/*]]>*/
+</style></head><body><h1>Public Key Server -- Get "0x86e4c4856e2d5148 "</h1>
+<pre>
+{key}
+</pre>
+</body></html>
+""".format(key=PUB_KEY)
+SEARCH_HTML = """
+<?xml version='1.0' encoding='utf-8'?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd" >
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>Search results for '0x86e4c4856e2d5148'</title>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<style type="text/css">
+/*<![CDATA[*/
+ .uid {{ color: green; text-decoration: underline; }}
+ .warn {{ color: red; font-weight: bold; }}
+/*]]>*/
+</style></head><body><h1>Search results for '0x86e4c4856e2d5148'</h1><pre>Type bits/keyID     Date       User ID
+</pre><hr /><pre>
+pub  2048R/<a href="/pks/lookup?op=get&amp;search=0x86E4C485{0}">{0}</a> 2016-03-09 <a href="/pks/lookup?op=vindex&amp;search=0x86E4C485{0}">Alex Bush (alexbush@sigaintevyh2rzvw.onion) &lt;alexbush@sigaint.org&gt;</a>
+</pre></body></html>
+""".format(KEY_ID)
 TO_CLIENT = "toclient"
 
 
@@ -295,12 +330,11 @@ class TestMEGAPI(TestCase):
 
     def test_getkey_by_message_id_with_side_effect(self):
         # The ultimate we can do when testing this function.
-        def side_effect(arg):
-            keyid = "111"
+        def side_effect(url, params):
             return {
-                "{}/api/v1/search/{}".format(self.cfg.config.keyservers[0], EMAIL1): MockResponse(200, bytes(json.dumps({"ids": [keyid]}), "utf8")),
-                "{}/api/v1/getkey/{}".format(self.cfg.config.keyservers[0], keyid): MockResponse(200, bytes(json.dumps({"key": PUB_KEY}), "utf8")),
-            }[arg]
+                EMAIL1: MockResponse(200, SEARCH_HTML),
+                "0x{}".format(KEY_ID): MockResponse(200, PUB_KEY_HTML),
+            }[params["search"]]
 
         data = {"email_to": EMAIL1, "email_from": EMAIL2, "message": MESSAGE1, "action": DECRYPT}
         self.put_encrypted_message_with_gcm_addition(data, 200, EMAIL1)
