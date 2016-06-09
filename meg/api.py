@@ -154,11 +154,11 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         content, status_code = get_key_by_id(cfg, keyid)
         return Response(json.dumps(content), content_type="application/json", status=status_code)
 
-    @app.route("{}/get_trust_level/<origin_keyid>/<contact_keyid>".
+    @app.route("{}/get_trust_level/<our_keyid>/<contact_keyid>".
                format(cfg.config.meg_url_prefix),
                methods=["GET"],
                strict_slashes=False)
-    def get_trust_level(origin_keyid, contact_keyid):
+    def get_trust_level(our_keyid, contact_keyid):
         """
         Get the trust level of a contact that we are communicating with
 
@@ -166,8 +166,8 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         1: can be verified through web of trust
         2: untrusted
         """
-        app.logger.debug("Get trust level for origin: {} contact: {}".format(origin_keyid, contact_keyid))
-        return str(verify_trust_level(cfg, origin_keyid, contact_keyid)), 200
+        app.logger.debug("Get trust level for our: {} contact: {}".format(our_keyid, contact_keyid))
+        return str(verify_trust_level(cfg, our_keyid, contact_keyid)), 200
 
     @app.route("{}/store_revocation_cert".format(cfg.config.meg_url_prefix),
                methods=["PUT"],

@@ -77,33 +77,33 @@ def store_revocation_cert(db, armored_key, RevocationKey):
         db.session.commit()
 
 
-def verify_trust_level(cfg, origin_keyid, contact_keyid):
+def verify_trust_level(cfg, our_keyid, contact_keyid):
     """
     Helper method for the API level task.
 
     0 if we directly trust contact
-    1 if can be validated through web of trust
+    1 if contact can be validated through web of trust
     2 if we cannot trust contact
     """
-    if determine_if_explicitly_trusted(cfg, origin_keyid, contact_keyid):
+    if determine_if_explicitly_trusted(cfg, our_keyid, contact_keyid):
         return 0
-    elif determine_through_web_of_trust(cfg, origin_keyid, contact_keyid):
+    elif determine_through_web_of_trust(cfg, our_keyid, contact_keyid):
         return 1
     else:
         return 2
 
 
-def determine_if_explicitly_trusted(cfg, origin_keyid, contact_keyid):
+def determine_if_explicitly_trusted(cfg, our_keyid, contact_keyid):
     """
     Determine if we directly trust the contact
     """
     results = get_all_key_signatures(cfg, contact_keyid)
     if not isinstance(results, list):  # Is a tuple of (status_code, content)
         return False
-    return True if origin_keyid in results else False
+    return True if our_keyid in results else False
 
 
-def determine_through_web_of_trust(cfg, origin_keyid, contact_keyid):
+def determine_through_web_of_trust(cfg, our_keyid, contact_keyid):
     """
     Find out if our contact is trusted through our web of trust
 
@@ -119,7 +119,7 @@ def determine_through_web_of_trust(cfg, origin_keyid, contact_keyid):
             if not isinstance(results, list):
                 continue
             for signature in results:
-                if signature == origin_keyid:
+                if signature == our_keyid:
                     return True
                 next_search.append(signature)
 

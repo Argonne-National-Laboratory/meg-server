@@ -1,8 +1,8 @@
 """
-meg.skier
-~~~~~~~~~
+meg.sks
+~~~~~~~
 
-Helper functions we can use for interacting with skier
+Helper functions we can use for interacting with sks
 """
 import json
 
@@ -12,12 +12,8 @@ import requests
 
 def get_all_key_signatures(cfg, keyid):
     """
-    Get all signatures for a specific key
-
-	The JSON response looks like
-
-	We exclude subkeys from the signing because this doesn't
-	contribute to WoT. Neither does self signing.
+    Get all signatures for a specific key. We exclude self signed signatures
+    because this is not helpful for us.
     """
     content, status_code = make_sks_request(
         cfg, requests.get, "lookup", {"op": "vindex", "search": "0x{}".format(keyid)}
@@ -29,7 +25,7 @@ def get_all_key_signatures(cfg, keyid):
     while (elem.findNext().name != "strong" and elem.findNext()):
         elem = elem.findNext()
         if "op=get" in elem["href"] and elem.text != keyid:
-            ids.append(keyid)
+            ids.append(elem.text)
     return ids
 
 

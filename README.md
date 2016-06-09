@@ -40,15 +40,20 @@ Get a key by an 8 char key id
 
 
 ### get_trust_level
-Get the trust level of a contacting key.
+Get the trust level of another key in relation to our web of trust.
 
-    GET /get_trust_level/<message origin key id>/<recipient key id>
+    GET /get_trust_level/<our key id>/<contact key id>
+
+Where
+
+ * `our key id`: Our key id
+ * `contact key id`: The key id of the party we are in communication with
 
 Returns:
 
- * `0` if we origin directly trusts the contact
- * `1` if origin trusts contact through web of trust
- * `2` if origin does not trust contact
+ * `0` if we directly trusts the contact
+ * `1` if we trust contact through web of trust
+ * `2` if we do not trust contact
 
 ### store_revocation_cert
 Store a revocation certificate on the server
