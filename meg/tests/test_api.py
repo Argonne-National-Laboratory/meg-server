@@ -229,6 +229,11 @@ class TestMEGAPI(TestCase):
         with patch("meg.sks.requests") as mock_requests:
             mock_requests.post.return_value = MockResponse(200, mock_content)
             response = self.client.put("/addkey", data={"keydata": PUB_KEY})
+            mock_requests.post.assert_called_once_with(
+                "{}/add".format(self.cfg.config.keyservers[0]),
+                data={"keytext": PUB_KEY},
+                params=None
+            )
             eq_(response.data.decode(), mock_content)
             eq_(response.status_code, 200)
 
@@ -237,11 +242,28 @@ class TestMEGAPI(TestCase):
             mock_requests.get.return_value = MockResponse(200, PUB_KEY_HTML)
             response = self.client.get("/getkey/{}".format(KEY_ID))
             eq_(json.loads(response.data.decode())["key"], PUB_KEY)
+            mock_requests.get.assert_called_once_with(
+                "{}/lookup".format(self.cfg.config.keyservers[0]),
+                data=None,
+                params={"op": "get", "search": "0x{}".format(KEY_ID)}
+            )
+            eq_(response.status_code, 200)
+
+    def test_search(self):
+        with patch("meg.sks.requests") as mock_requests:
+            mock_requests.get.return_value = MockResponse(200, SEARCH_HTML)
+            response = self.client.get("/search/Alex%20Bush")
+            eq_(json.loads(response.data.decode())["ids"], [KEY_ID])
+            mock_requests.get.assert_called_once_with(
+                "{}/lookup".format(self.cfg.config.keyservers[0]),
+                data=None,
+                params={"op": "index", "search": "Alex Bush"}
+            )
             eq_(response.status_code, 200)
 
     def test_get_trust_level_for_level_zero_trust(self):
         web = {"0x{}".format(KEY_ID): MockResponse(200, DIRECT_SIGNATURE_HTML)}
-        side_effect = lambda _, params: web[params["search"]]
+        side_effect = lambda path, params, data: web[params["search"]]
         with patch("meg.sks.requests") as mock_requests:
             mock_requests.get.side_effect = side_effect
             response = self.client.get(
@@ -255,7 +277,7 @@ class TestMEGAPI(TestCase):
             "0x{}".format(KEY_ID_RUDOLPH_REHM): MockResponse(200, WEB_OF_TRUST_RR_HTML),
             "0x{}".format(KEY_ID_FLORIAN): MockResponse(200, WEB_OF_TRUST_FL_HTML),
         }
-        side_effect = lambda arg, params: web[params["search"]]
+        side_effect = lambda path, params, data: web[params["search"]]
         with patch("meg.sks.requests") as mock_requests:
             mock_requests.get.side_effect = side_effect
             response = self.client.get("/get_trust_level/{}/{}".format(KEY_ID_TSP, KEY_ID_RUDOLPH_REHM))
@@ -266,7 +288,7 @@ class TestMEGAPI(TestCase):
         web = {
             "0x{}".format(KEY_ID_OBAMA): MockResponse(200, NO_TRUST_SIGNATURE_HTML)
         }
-        side_effect = lambda arg, params: web[params["search"]]
+        side_effect = lambda path, params, data: web[params["search"]]
         with patch("meg.sks.requests") as mock_requests:
             mock_requests.get.side_effect = side_effect
             response = self.client.get("/get_trust_level/{}/{}".format(KEY_ID, KEY_ID_OBAMA))
@@ -430,7 +452,7 @@ class TestMEGAPI(TestCase):
 
     def test_getkey_by_message_id_with_side_effect(self):
         # The ultimate we can do when testing this function.
-        def side_effect(url, params):
+        def side_effect(url, params, data):
             return {
                 EMAIL1: MockResponse(200, SEARCH_HTML),
                 "0x{}".format(KEY_ID): MockResponse(200, PUB_KEY_HTML),
