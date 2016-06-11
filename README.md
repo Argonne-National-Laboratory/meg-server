@@ -15,11 +15,7 @@ that your inventory file can point to the server you wish to install on. After t
 is completed then you can deploy the server
 
     cd ansible
-    ansible-playbook -i inventory deploy.yml --extra-vars 'meg_user_password=<meg db pw> skier_user_password=<skier db pw> megserver_gcm_api_key=<gcm api key> sendgrid_api_key=<sendgrid api secret>'
-
-If you just want to upgrade your version of megserver/skier then you can use a tag
-
-    ansible-playbook -i inventory deploy.yml --extra-vars 'meg_user_password=<meg db pw> skier_user_password=<skier db pw> megserver_gcm_api_key=<gcm api key> sendgrid_api_key=<sendgrid api secret>' -t <skier OR megserver>
+    ansible-playbook -i inventory deploy.yml --extra-vars 'meg_user_password=<meg db pw> megserver_gcm_api_key=<gcm api key> sendgrid_api_key=<sendgrid api secret>'
 
 ## API
 megserver provides a wrapper around PGP keyserver APIs and adds additional APIs for
