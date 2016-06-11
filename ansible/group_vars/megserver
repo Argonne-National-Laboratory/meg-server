@@ -1,5 +1,6 @@
 ---
-megserver_hostname_url: http://grehm.us
+# XXX make this below variable more robust
+megserver_hostname_url: http://mobileencryptiongateway.org
 megserver_version: 0.6.0
 megserver_gunicorn_bind_addr: unix:/var/tmp/megserver.sock
 

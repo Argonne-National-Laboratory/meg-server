@@ -1,0 +1,2 @@
+[megserver]
+mobileencryptiongateway.org ansible_port=2223
