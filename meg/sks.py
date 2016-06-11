@@ -5,9 +5,12 @@ meg.sks
 Helper functions we can use for interacting with sks
 """
 import json
+import re
 
 from bs4 import BeautifulSoup
 import requests
+
+from meg.constants import HTML_PARSER
 
 
 def get_all_key_signatures(cfg, keyid):
@@ -20,7 +23,7 @@ def get_all_key_signatures(cfg, keyid):
     )
     if status_code != 200:
         return status_code, content
-    elem = BeautifulSoup(content).span
+    elem = BeautifulSoup(content, HTML_PARSER).span
     ids = []
     while (elem.findNext().name != "strong" and elem.findNext()):
         elem = elem.findNext()
@@ -52,8 +55,13 @@ def search_key(cfg, search_str):
     )
     if status_code != 200:
         return content, status_code
-    bs = BeautifulSoup(content)
-    ids = [a.text for a in bs.findAll("a") if "op=get" in a["href"]]
+    bs = BeautifulSoup(content, HTML_PARSER)
+    regex = re.compile(r"^pub *\d{3,4}\w\/([\w\d]{8})")
+    ids = []
+    for pre in bs.findAll("pre"):
+        match = regex.search(pre.text.strip("\r\n"))
+        if match and not "KEY REVOKED" in pre.text:
+            ids.append(match.groups()[0])
     return {"ids": ids}, status_code
 
 
@@ -66,7 +74,7 @@ def get_key_by_id(cfg, keyid):
     )
     if status_code != 200:
         return content, status_code
-    return {"key": BeautifulSoup(content).pre.text.strip("\r\n")}, status_code
+    return {"key": BeautifulSoup(content, HTML_PARSER).pre.text.strip("\r\n")}, status_code
 
 
 def addkey_to_sks(cfg, keytext):

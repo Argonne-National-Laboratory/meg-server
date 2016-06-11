@@ -7,3 +7,4 @@ EMAIL_HTML = """
 
 <div>{link}</div>
 """
+HTML_PARSER = "html.parser"

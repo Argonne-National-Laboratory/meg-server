@@ -99,6 +99,26 @@ SEARCH_HTML = """
 pub  2048R/<a href="/pks/lookup?op=get&amp;search=0x86E4C485{0}">{0}</a> 2016-03-09 <a href="/pks/lookup?op=vindex&amp;search=0x86E4C485{0}">Alex Bush (alexbush@sigaintevyh2rzvw.onion) &lt;alexbush@sigaint.org&gt;</a>
 </pre></body></html>
 """.format(KEY_ID)
+SEARCH_HTML_WITH_REVOKED = """
+CTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd" >
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>Search results for 'foobar'</title>
+<meta content="text/html;charset=utf-8" http-equiv="Content-Type"/>
+<style type="text/css">
+/*<![CDATA[*/
+ .uid {{ color: green; text-decoration: underline; }}
+ .warn {{ color: red; font-weight: bold; }}
+/*]]>*/
+</style></head><body><h1>Search results for 'foobar'</h1><pre>Type bits/keyID     Date       User ID
+</pre><hr/><pre>
+pub  2048R/<a href="/pks/lookup?op=get&amp;search=0x35F76BB5C8F142FE">C8F142FE</a> 2016-06-10 *** KEY REVOKED *** [not verified]
+                               <a href="/pks/lookup?op=vindex&amp;search=0x35F76BB5C8F142FE">foo bar (MEG PGP Key) &lt;foobar@gmail.com&gt;</a>
+</pre><hr/><pre>
+pub  4096R/<a href="/pks/lookup?op=get&amp;search=0xB0CFA718{0}">{0}</a> 2015-05-13 <a href="/pks/lookup?op=vindex&amp;search=0xB0CFA718{0}">foo bar &lt;foobar@gmail.com&gt;</a>
+</pre></body></html>
+""".format(KEY_ID)
 DIRECT_SIGNATURE_HTML = """
 <?xml version='1.0' encoding='utf-8'?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd" >
@@ -108,8 +128,8 @@ DIRECT_SIGNATURE_HTML = """
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <style type="text/css">
 /*<![CDATA[*/
- .uid {{ color: green; text-decoration: underline; }}
- .warn {{ color: red; font-weight: bold; }}
+.uid {{ color: green; text-decoration: underline; }}
+.warn {{ color: red; font-weight: bold; }}
 /*]]>*/
 </style></head><body><h1>Search results for '0x86e4c485{0}'</h1><pre>Type bits/keyID     cr. time   exp time   key expir
 </pre><hr /><pre><strong>pub</strong>  2048R/<a href="/pks/lookup?op=get&amp;search=0x86E4C485{0}">{0}</a> 2016-03-09
@@ -133,8 +153,8 @@ WEB_OF_TRUST_RR_HTML = """
 <meta content="text/html;charset=utf-8" http-equiv="Content-Type"/>
 <style type="text/css">
 /*<![CDATA[*/
- .uid {{ color: green; text-decoration: underline; }}
- .warn {{ color: red; font-weight: bold; }}
+.uid {{ color: green; text-decoration: underline; }}
+.warn {{ color: red; font-weight: bold; }}
 /*]]>*/
 </style></head><body><h1>Search results for '0xbd50f3921863b80b'</h1><pre>Type bits/keyID     cr. time   exp time   key expir
 </pre><hr/><pre><strong>pub</strong>  4096R/<a href="/pks/lookup?op=get&amp;search=0xBD50F3921863B80B">1863B80B</a> 2015-01-17
@@ -157,8 +177,8 @@ WEB_OF_TRUST_FL_HTML = """
 <meta content="text/html;charset=utf-8" http-equiv="Content-Type"/>
 <style type="text/css">
 /*<![CDATA[*/
- .uid {{ color: green; text-decoration: underline; }}
- .warn {{ color: red; font-weight: bold; }}
+.uid {{ color: green; text-decoration: underline; }}
+.warn {{ color: red; font-weight: bold; }}
 /*]]>*/
 </style></head><body><h1>Search results for '0x68770b1f4ce9f269'</h1><pre>Type bits/keyID     cr. time   exp time   key expir
 </pre><hr/><pre><strong>pub</strong>  2048R/<a href="/pks/lookup?op=get&amp;search=0x68770B1F4CE9F269">4CE9F269</a> 2011-10-15
@@ -258,6 +278,18 @@ class TestMEGAPI(TestCase):
                 "{}/lookup".format(self.cfg.config.keyservers[0]),
                 data=None,
                 params={"op": "index", "search": "Alex Bush"}
+            )
+            eq_(response.status_code, 200)
+
+    def test_search_with_revoked_keys(self):
+        with patch("meg.sks.requests") as mock_requests:
+            mock_requests.get.return_value = MockResponse(200, SEARCH_HTML_WITH_REVOKED)
+            response = self.client.get("/search/foobar")
+            eq_(json.loads(response.data.decode())["ids"], [KEY_ID])
+            mock_requests.get.assert_called_once_with(
+                "{}/lookup".format(self.cfg.config.keyservers[0]),
+                data=None,
+                params={"op": "index", "search": "foobar"}
             )
             eq_(response.status_code, 200)
 

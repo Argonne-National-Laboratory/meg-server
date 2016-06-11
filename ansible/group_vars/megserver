@@ -1,6 +1,6 @@
 ---
 megserver_hostname_url: http://grehm.us
-megserver_version: 0.5.1
+megserver_version: 0.6.0
 megserver_gunicorn_bind_addr: unix:/var/tmp/megserver.sock
 
 nginx_default_enable: false

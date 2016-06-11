@@ -74,7 +74,8 @@ Revoke a users public key
     GET /revoke/?keyid=<8 digit public key id>&token=<revocation token>
 
 ### search
-Search for a users public key by some string, maybe by email address or name
+Search for a users public key by some string, maybe by email address or name.
+This will get all non-revoked keys matching that string.
 
     GET /search/<search string>
 
