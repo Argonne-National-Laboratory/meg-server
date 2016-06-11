@@ -10,12 +10,10 @@ install ansible
     source venv27/bin/activate
     pip install ansible
 
-Then you can install meg on your server. If need be modify ansible/inventory so
-that your inventory file can point to the server you wish to install on. After this
-is completed then you can deploy the server
+Then you can install meg on your server.
 
     cd ansible
-    ansible-playbook -i inventory deploy.yml --extra-vars 'meg_user_password=<meg db pw> megserver_gcm_api_key=<gcm api key> sendgrid_api_key=<sendgrid api secret>'
+    ansible-playbook -i prod.inv deploy.yml --extra-vars 'meg_user_password=<meg db pw> megserver_gcm_api_key=<gcm api key> sendgrid_api_key=<sendgrid api secret>'
 
 ## API
 megserver provides a wrapper around PGP keyserver APIs and adds additional APIs for
