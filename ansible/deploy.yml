@@ -2,4 +2,4 @@
 
 - hosts: megserver
   roles:
-    - ansible-meg-server
+    - hahnicity.meg-server

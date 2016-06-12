@@ -9,12 +9,25 @@ install ansible
     virtualenv venv27
     source venv27/bin/activate
     pip install ansible
+    cd ansible
+    ansible-galaxy install -r requirements.yml
 
 Then you can install meg on your server.
 
-    cd ansible
     ansible-playbook -i prod.inv deploy.yml --extra-vars 'meg_user_password=<meg db pw> megserver_gcm_api_key=<gcm api key> sendgrid_api_key=<sendgrid api secret>'
 
+## Testing
+Testing is important if you want to ensure that the changes you made to the server
+did not break anything. We are performing all testing through `nose`. First you
+will need to install nose in your virtualenv
+
+    pip install nose
+
+Then you need to run the tests
+
+    nosetests
+
+Failing tests are indicative of some breakage! **DO NOT** ignore failing tests.
 ## API
 megserver provides a wrapper around PGP keyserver APIs and adds additional APIs for
 MEG specific functionality as well.

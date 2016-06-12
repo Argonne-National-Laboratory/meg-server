@@ -72,5 +72,5 @@ buildvenv/
 # ansible related
 ANXS*
 DavidWittman*
-ansible-meg-server
+hahnicity.meg-server*
 *.retry

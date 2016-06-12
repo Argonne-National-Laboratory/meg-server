@@ -8,3 +8,6 @@
 
 - src: ANXS.nginx
   path: roles/
+
+- src: hahnicity.meg-server
+  path: roles/
