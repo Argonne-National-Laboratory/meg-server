@@ -4,6 +4,7 @@ megserver_hostname_url: http://mobileencryptiongateway.org
 megserver_version: 0.6.0
 megserver_gunicorn_bind_addr: unix:/var/tmp/megserver.sock
 
+nginx_dir: /etc/nginx
 nginx_default_enable: false
 nginx_client_body_buffer_size: 4k
 nginx_client_header_buffer_size: 4k

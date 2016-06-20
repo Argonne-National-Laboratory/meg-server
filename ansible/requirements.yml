@@ -1,19 +1,11 @@
 ---
-
-- src: DavidWittman.redis
-  path: roles/
-
 - src: ANXS.postgresql
   path: roles/
 
-- src: ANXS.build-essential
+- src: ANXS.nginx
+  version: master
   path: roles/
 
-- src: ANXS.perl
-  path: roles/
-
-- src: ANXS.monit
-  path: roles/
-
-- src: ANXS.hostname
+- src: hahnicity.meg-server
+  version: master
   path: roles/
