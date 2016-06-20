@@ -70,7 +70,7 @@ buildvenv/
 *.sh
 
 # ansible related
-ANXS*
+*ANXS*
 DavidWittman*
-hahnicity.meg-server*
+*hahnicity.meg-server*
 *.retry
