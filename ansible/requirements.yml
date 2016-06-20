@@ -17,6 +17,3 @@
 
 - src: ANXS.hostname
   path: roles/
-
-- src: hahnicity.meg-server
-  path: roles/
