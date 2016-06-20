@@ -6,7 +6,16 @@
 - src: ANXS.postgresql
   path: roles/
 
-- src: ANXS.nginx
+- src: ANXS.build-essential
+  path: roles/
+
+- src: ANXS.perl
+  path: roles/
+
+- src: ANXS.monit
+  path: roles/
+
+- src: ANXS.hostname
   path: roles/
 
 - src: hahnicity.meg-server
