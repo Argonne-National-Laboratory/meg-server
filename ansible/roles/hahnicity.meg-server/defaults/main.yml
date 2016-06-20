@@ -1,0 +1,22 @@
+---
+meg_supervisor_config_dir: /etc/supervisor/conf.d
+
+python3_version: python3.4
+
+megserver_config_dir: /etc/megserver
+megserver_install_dir: /opt/megserver
+megserver_log_dir: /var/log/megserver
+megserver_proc_user: nobody
+megserver_proc_group: nogroup
+megserver_gcm_api_key: XXX
+megserver_gunicorn_bind_addr: 0.0.0.0:5001
+# This is for the development server
+megserver_hostname_url: http://localhost
+megserver_version: 0.6.0
+megserver_nginx_location: /megserver
+
+sendgrid_api_key: XXX
+sendgrid_from_email: noreply@meg.com
+sendgrid_subject: MEG Key Revocation Confirmation
+
+nginx_log_dir: /var/log/nginx

@@ -1,0 +1,10 @@
+---
+- name: install sks
+  include: sks.yml
+  tags:
+    - sks
+
+- name: install megserver
+  include: megserver.yml
+  tags:
+    - megserver

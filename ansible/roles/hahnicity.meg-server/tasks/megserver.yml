@@ -1,0 +1,78 @@
+---
+
+- name: Install prereqs
+  apt: name=supervisor
+
+- name: Create megserver dirs
+  file: name={{ item }} state=directory
+  with_items:
+    - "{{ megserver_config_dir }}"
+    - "{{ megserver_install_dir }}"
+
+- name: Create megserver log dir
+  file:
+    name={{ megserver_log_dir }}
+    state=directory
+    owner={{ megserver_proc_user }}
+    group={{ megserver_proc_group }}
+
+- name: Create megserver virtualenv
+  pip:
+    virtualenv={{ megserver_install_dir }}/venv
+    virtualenv_python={{ python3_version }}
+    version={{ megserver_version }}
+    name=megserver
+  notify:
+    - restart megserver
+    - restart celery
+
+- name: Install psycopg2
+  pip: name=psycopg2
+
+- name: Create postgres db user for megserver
+  postgresql_user:
+    name=meg
+    password={{ meg_user_password }}
+
+- name: Create postgres db for megserver
+  postgresql_db: name=meg owner=meg
+
+- name: grant privileges to megserver
+  postgresql_privs: db=meg roles=meg privs=ALL type=database
+
+- name: Setup meg config
+  template: src=megserver_main_config.yml dest={{ megserver_config_dir }}/config.yml
+  notify:
+    - restart megserver
+    - restart celery
+
+- name: Setup megserver gunicorn
+  template: src=megserver_gunicorn_config.py dest={{ megserver_config_dir }}/gunicorn_config.py
+  notify:
+    - restart megserver
+    - restart celery
+
+- name: Setup megserver supervisor config
+  template: src=megserver_supervisor.conf dest={{ meg_supervisor_config_dir }}/meg.conf
+  notify:
+    - restart megserver
+    - restart celery
+
+- name: ensure meg processes are loaded in supervisor
+  supervisorctl: name={{ item }} state=present
+  with_items:
+    - megserver
+    - megserver_celery
+
+- name: setup megserver nginx config
+  template: src=megserver_nginx dest=/etc/nginx/sites-available/megserver
+  notify:
+    - reload nginx
+
+- name: enable megserver
+  file:
+    src=/etc/nginx/sites-available/megserver
+    dest=/etc/nginx/sites-enabled/megserver
+    state=link
+  notify:
+    - reload nginx
