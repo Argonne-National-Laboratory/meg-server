@@ -58,25 +58,49 @@ def put_message(app, db, db_models, celery_tasks):
     content_type = request.headers["Content-Type"]
     # Things need to be base64 encoded. I want to demand ascii soon
     # but must figure out a way to do it.
+
+    # Check message type
     if "text/plain" not in content_type:
         return "", 415
 
+    app.logger.debug("GETTING HTTP POST PARAMS")
+
+    # Get all variables from HTTP header
     action = request.args['action']  # Can be encrypt, decrypt, or toclient
     email_to = request.args['email_to']
     email_from = request.args['email_from']
+    try:
+        client_id = request.args['client_id']
+    except KeyError:
+        client_id = "PHONE"
+    try:
+        msg_id = request.args['msg_id']
+    except KeyError:
+        msg_id = "PHONE"
+
+    app.logger.debug("PUT MESSAGE WITH CLIENT ID: {}".format(
+        client_id
+    ))
+
     if action not in constants.APPROVED_ACTIONS:
         return "", 400
 
+    # Get data from message and decode
     message = request.data
     if isinstance(message, bytes):
         message = message.decode("ascii")
-    app.logger.debug("Put new message in db for {}, from {}, with action {}".format(
-        email_to, email_from, action
+
+    # Debugging
+    app.logger.debug("Put new message {} from {} in db for {}, from {}, with action {}".format(
+        msg_id, client_id, email_to, email_from, action
     ))
-    app.logger.debug("Put new {} message addressed to {} from {}".format(action, email_to, email_from))
-    new_message = db_models.MessageStore(email_to, email_from, message, action)
+
+    # Put new message in database
+    new_message = db_models.MessageStore(client_id, msg_id, email_to, email_from, message, action)
     db.session.add(new_message)
     db.session.commit()
+
+    # Either send to phone or return 200 OK
     if action != "toclient":
         return send_message_to_phone(app, db, db_models, celery_tasks, action, email_to, email_from)
     else:
@@ -90,6 +114,9 @@ def get_message(app, db, db_models):
     message_id = request.args.get('message_id')
     email_from = request.args.get("email_from")
     email_to = request.args.get("email_to")
+    client_id = request.args.get("client_id")
+    msg_id = request.args.get("msg_id")
+
     app.logger.debug("Get message with id {}, email_from {}, email_to {}.".format(
         message_id, email_from, email_to
     ))
@@ -151,10 +178,12 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
                methods=["GET"],
                strict_slashes=False)
     def getkey(keyid):
+        app.logger.debug("Get key: {}".format(keyid))
         content, status_code = get_key_by_id(cfg, keyid)
         return Response(json.dumps(content), content_type="application/json", status=status_code)
 
     @app.route("{}/get_trust_level/<our_keyid>/<contact_keyid>".
+
                format(cfg.config.meg_url_prefix),
                methods=["GET"],
                strict_slashes=False)
@@ -269,7 +298,7 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
             instance_id = request.form["gcm_instance_id"]
             phone_number = request.form["phone_number"]
             email = request.form["email"]
-            app.logger.debug("Store GCM iid: {} for email: {} phone: {}".format(
+            app.logger.debug("Store GCM id: {} for email: {} phone: {}".format(
                 instance_id, email, phone_number
             ))
             iid = GcmInstanceId.query.filter(GcmInstanceId.email == email).one()
@@ -289,15 +318,23 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         Get the public key of the party we want to send an encrypted message to
         """
         try:
+            #Get ID from HTTP Header
             message_id = request.args["associated_message_id"]
+            app.logger.debug("Get key by msg id: {}".format(message_id))
+
+            #
             message = db_models.MessageStore.query.filter(
                 db_models.MessageStore.id == message_id
             ).one()
             content, code = search_key(cfg, message.email_to)
+
+            #Return error code if not 200 OK
             if code != 200:
                 return "", code
+
             id = content["ids"][0]
             content, code = get_key_by_id(cfg, id)
+
             if code != 200:
                 return "", code
         except NoResultFound:

@@ -50,14 +50,18 @@ def generate_models(db):
         Stores messages for eventual transmission to client or app
         """
         id = db.Column(db.Integer, primary_key=True)
+        msg_id = db.Column(db.Text, nullable=True)
+        client_id = db.Column(db.Text, nullable=True)
         action = db.Column(db.VARCHAR(8), nullable=False)
         email_to = db.Column(db.Text, nullable=False)
         email_from = db.Column(db.Text, nullable=False)
         message = db.Column(db.Text, nullable=False)
         created_at = db.Column(db.DateTime, nullable=False)
 
-        def __init__(self, email_to, email_from, message, action):
+        def __init__(self, client_id, msg_id, email_to, email_from, message, action):
             self.action = action
+            self.client_id = client_id
+            self.msg_id = msg_id
             self.email_to = email_to
             self.email_from = email_from
             self.message = message
