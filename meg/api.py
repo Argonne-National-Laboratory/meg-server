@@ -22,34 +22,20 @@ from meg.pgp import (
 from meg.sks import addkey_to_sks, get_key_by_id, search_key
 
 
-def send_message_to_phone(app, db, db_models, celery_tasks, action, email_to, email_from):
-    # Query the db for the message id. We do not know it because it is dynamically
-    # allocated
+def send_message_to_phone(app, db, db_models, celery_tasks, instance_id, msg_id):
+    # Get message associated with msg_id
     committed_message = db_models.MessageStore.query.filter(
-        db_models.MessageStore.email_to == email_to
-    ).order_by(
-        db_models.MessageStore.created_at.desc()
+        db_models.MessageStore.msg_id == msg_id
     ).first()
+
     if not committed_message:
-        app.logger.error("Was not able to commit {} message addressed to email {}".format(action, email_to))
+        app.logger.error("Was not able to commit {} message addressed to email {} with id {}".format(commited_message.action, email_to, msg_id))
         # this shouldn't happen. (But saying this is asking for it to happen)
         return "", 500
 
-    # XXX The logic is a bit overly complex here. If the message is being encrypted it
-    # is from the originating client. If the message is being decrypted it is from a 3rd party
-    # so the gcm instance id will be associated with email_to. Inevitably we will have bugs here
-    # where a message gets sent to the server but maybe someone hasn't registered yet. So...
-    # must be refactored and redone. This is getting painful
-    if action == "encrypt":
-        user_email = email_from
-    elif action == "decrypt":
-        user_email = email_to
-    try:
-        instance_id = db_models.GcmInstanceId.query.filter(db_models.GcmInstanceId.email == user_email).one()
-    except NoResultFound:
-        return "", 404
+    # Add to celery to send to phone
     celery_tasks.transmit_gcm_id.apply_async(
-        (instance_id.instance_id, committed_message.id, committed_message.action)
+        (instance_id.instance_id, committed_message.msg_id, committed_message.client_id, committed_message.action)
     )
     return "", 200
 
@@ -63,8 +49,6 @@ def put_message(app, db, db_models, celery_tasks):
     if "text/plain" not in content_type:
         return "", 415
 
-    app.logger.debug("GETTING HTTP POST PARAMS")
-
     # Get all variables from HTTP header
     action = request.args['action']  # Can be encrypt, decrypt, or toclient
     email_to = request.args['email_to']
@@ -77,10 +61,6 @@ def put_message(app, db, db_models, celery_tasks):
         msg_id = request.args['msg_id']
     except KeyError:
         msg_id = "PHONE"
-
-    app.logger.debug("PUT MESSAGE WITH CLIENT ID: {}".format(
-        client_id
-    ))
 
     if action not in constants.APPROVED_ACTIONS:
         return "", 400
@@ -102,51 +82,59 @@ def put_message(app, db, db_models, celery_tasks):
 
     # Either send to phone or return 200 OK
     if action != "toclient":
-        return send_message_to_phone(app, db, db_models, celery_tasks, action, email_to, email_from)
+        # Get GCM ID and send to phone
+        # XXX The logic is a bit overly complex here. If the message is being encrypted it
+        # is from the originating client. If the message is being decrypted it is from a 3rd party
+        # so the gcm instance id will be associated with email_to. Inevitably we will have bugs here
+        # where a message gets sent to the server but maybe someone hasn't registered yet. So...
+        # must be refactored and redone. This is getting painful
+        if action == "encrypt":
+            user_email = email_from
+        elif action == "decrypt":
+            user_email = email_to
+        try:
+            instance_id = db_models.GcmInstanceId.query.filter(db_models.GcmInstanceId.email == user_email).one()
+        except NoResultFound:
+            return "", 404
+        return send_message_to_phone(app, db, db_models, celery_tasks, instance_id, msg_id)
+
     else:
         return "", 200
 
 
 def get_message(app, db, db_models):
-    # XXX This doesn't cover the case of having multiple messages from the same person to
-    # the same recipient but with different subject lines. For now punt on the problem since
-    # we don't need to solve it right now
-    message_id = request.args.get('message_id')
-    email_from = request.args.get("email_from")
-    email_to = request.args.get("email_to")
-    client_id = request.args.get("client_id")
-    msg_id = request.args.get("msg_id")
 
-    app.logger.debug("Get message with id {}, email_from {}, email_to {}.".format(
-        message_id, email_from, email_to
+    # Get all variables from HTTP arguments
+    msg_id = request.args.get("message_id")
+
+    # Log message details
+    app.logger.debug("Get message with id {}".format(
+        msg_id
     ))
-    # Must have either a message id (for use by the app) or email_from and email_to
-    # (for use by the client)
-    if not message_id and not (email_from and email_to):
+
+    # Must have either a message id for message lookup
+    if not msg_id:
         return "", 400
 
-    if message_id:
-        app.logger.debug("Get encrypted message with id {}".format(message_id))
+    # XXX Need to stop using the else
+    if msg_id:
+        app.logger.debug("Get encrypted message with id {}".format(msg_id))
         message = db_models.MessageStore.query.filter(
-            db_models.MessageStore.id==int(message_id)
-        ).first()
-    else:
-        app.logger.debug("Get email for {} from {}".format(email_to, email_from))
-        message = db_models.MessageStore.query.filter(
-            (db_models.MessageStore.email_to==email_to) &
-            (db_models.MessageStore.action=="toclient") &
-            (db_models.MessageStore.email_from==email_from)
+            db_models.MessageStore.msg_id==msg_id
         ).first()
 
+    # Log no message was found
     if not message:
-        app.logger.warn("Could not find message with id: {} to: {} from: {}".format(
-            message_id, email_to, email_from)
+        app.logger.warn("Could not find message with id: {}".format(
+            msg_id)
         )
         return "", 404
 
-    # Remove the object that we just got.
+    # Remove message from database
     db.session.delete(message)
     db.session.commit()
+
+    # Return JSON object with message details
     return Response(
         json.dumps({
             # TODO I can move from here soon and remove the associated_message API
@@ -161,6 +149,7 @@ def get_message(app, db, db_models):
 
 def create_routes(app, db, cfg, db_models, celery_tasks):
 
+    #Setup database objects
     RevocationKey = db_models.RevocationKey
     GcmInstanceId = db_models.GcmInstanceId
     RevocationToken = db_models.RevocationToken
@@ -319,12 +308,12 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         """
         try:
             #Get ID from HTTP Header
-            message_id = request.args["associated_message_id"]
-            app.logger.debug("Get key by msg id: {}".format(message_id))
+            msg_id = request.args["associated_message_id"]
+            app.logger.debug("Get key by msg id: {}".format(msg_id))
 
             #
             message = db_models.MessageStore.query.filter(
-                db_models.MessageStore.id == message_id
+                db_models.MessageStore.msg_id == msg_id
             ).one()
             content, code = search_key(cfg, message.email_to)
 

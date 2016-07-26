@@ -14,18 +14,28 @@ def create_celery_routes(celery, cfg):
     # have a cron task that takes messages that have failed their retries and
     # continually resend them
     @celery.task(max_retries=cfg.config.celery.transmit_gcm_id.retries)
-    def transmit_gcm_id(gcm_iid, id, action):
+    def transmit_gcm_id(gcm_iid, msg_id, client_id, action):
+        # Only send predefined actions
         if action not in constants.PHONE_ACTIONS:
             raise Exception("Choose an action that is one of {}".format(PHONE_ACTIONS))
+
+        # Get GCM API key
         gcm = GCM(cfg.config.gcm_api_key)
-        data = {"message_id": id, "action": action}
+
+        # Log transmission
+        data = {"message_id": msg_id, "client_id": client_id, "action": action}
         logger.info("Transmit id: {} to phone with iid: {}".format(id, gcm_iid))
+
+        # Get Response
         response = gcm.json_request(registration_ids=[gcm_iid], data=data)
+
+        # Check errors and retry if necessary
         if 'errors' in response:
             logger.warn("Error found in response: {}".format(response))
             transmit_gcm_id.retry(
-                args=[gcm_iid, id, action], countdown=cfg.config.celery.transmit_gcm_id.timeout
+                args=[gcm_iid, msg_id, client_id, action], countdown=cfg.config.celery.transmit_gcm_id.timeout
             )
+        # Log success
         else:
             logger.debug("Message transmitted successfully response: {}".format(response))
 
