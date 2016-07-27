@@ -106,31 +106,31 @@ def get_message(app, db, db_models):
 
     # Get all variables from HTTP arguments
     msg_id = request.args.get("message_id")
-
-    # Log message details
-    app.logger.debug("Get message with id {}".format(
-        msg_id
-    ))
+    client_id = request.args.get("client_id")
+    if not client_id:
+        client_id = "PHONE"
 
     # Must have either a message id for message lookup
     if not msg_id:
         return "", 400
 
-    # XXX Need to stop using the else
+    # If there's a message id, look for it in the DB
     if msg_id:
-        app.logger.debug("Get encrypted message with id {}".format(msg_id))
+        app.logger.debug("Get message for client_id {} with msg_id {}".format(client_id, msg_id))
+        # Search for a message_id that wasn't posted by the client
         message = db_models.MessageStore.query.filter(
-            db_models.MessageStore.msg_id==msg_id
+            (db_models.MessageStore.msg_id == msg_id) &
+            (db_models.MessageStore.client_id != client_id)
         ).first()
 
-    # Log no message was found
-    if not message:
-        app.logger.warn("Could not find message with id: {}".format(
-            msg_id)
-        )
-        return "", 404
+        # Log no message was found
+        if not message:
+            app.logger.warn("Could not find message with id: {}".format(
+                msg_id)
+            )
+            return "", 404
 
-    # Remove message from database
+    # Remove message from database after it's found
     db.session.delete(message)
     db.session.commit()
 
