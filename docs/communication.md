@@ -1,3 +1,3 @@
 # Communication 
 
-![Communication flowchart](images/Communication.svg)
+![Communication flowchart](https://cdn.rawgit.com/Argonne-National-Laboratory/meg-server/master/docs/images/Communication.svg)
