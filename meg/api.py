@@ -210,6 +210,7 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         """
         Revoke a users public key certificate
         """
+        # Query the requested keyid and associated token are in the DB
         keyid = request.args["keyid"]
         auth_token = request.args["token"]
         token_result = RevocationToken.query.filter(
@@ -217,16 +218,25 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         ).order_by(RevocationToken.created_at.desc())
 
         # TODO We need to clean up old revocation requests in the DB
+        # Check if there is an available row
         token_row = token_result.first()
+
+        # 404 if no request is found
         if not token_row:
             return "", 404
+        # 401 if the auth_token doesn't match
         if auth_token != token_row.hex:
             return "", 401
+
+        # Remove the requested row from the DB
         db.session.delete(token_row)
         db.session.commit()
+
+        # Check if the 1 hour time constraint on the token is valid
         if time.time() - int(token_row.created_at.strftime("%s")) > cfg.config.revocation.ttl:
             return "It has been longer than 1 hour since this request was first triggered. Please make a new request to revoke from the phone", 401
 
+        # Try to find the revocation key in the db for the given keyid
         try:
             app.logger.warn("Revoke certificate for key: {}".format(keyid))
             result = RevocationKey.query.options(load_only("armored")).filter(
@@ -235,10 +245,13 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
             armored = result.distinct().one().armored
         except NoResultFound:
             return "Key {} not found".format(keyid), 404
+
+        # Add the revocation cert to the keyserver
         _, code = _addkey(armored)
         if code != 200:
             return "We were unable to revoke the token. Please try restarting the revocation process", code
 
+        # Remove the gcm instance from
         try:
             instance_id = db_models.GcmInstanceId.query.filter(
                 db_models.GcmInstanceId.email == token_row.user_email
@@ -246,7 +259,7 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         except NoResultFound:
             return "", 404
         celery_tasks.remove_key_data.apply_async((instance_id.instance_id,))
-        return "", 200
+        return "PGP key with ID %s has been revoked. This key will no longer be used to send encrypted mail" % (keyid), 200
 
     @app.route("{}/request_revoke/".format(cfg.config.meg_url_prefix),
                methods=["POST"],
@@ -255,19 +268,30 @@ def create_routes(app, db, cfg, db_models, celery_tasks):
         """
         Send a revocation request to the users email address.
         """
+        # Get the keyID
         keyid = request.args["keyid"]
+
+        # If the key isn't 8 characters long then return a 400
         if len(keyid) != 8:
             return "", 400
+
+        # Try to get the key and continue if successful
         content, code = get_key_by_id(cfg, keyid)
         if code != 200:
             return content, code
+
+        # Generate random uuid
         hex = uuid4().hex
+
+        # Generate revocation token and insert into database
         user_email = get_user_email_from_key(content['key'])
         revocation = RevocationToken(keyid, hex, user_email)
         db.session.add(revocation)
         db.session.commit()
-        content, code = send_revocation_request_email(cfg, keyid, hex, user_email)
-        return content, code
+
+        # Send a revocation email to the user to confirm revocation
+        _, code = send_revocation_request_email(cfg, keyid, hex, user_email)
+        return "", code
 
     @app.route("{}/search/<search_str>".format(cfg.config.meg_url_prefix),
                methods=["GET"])

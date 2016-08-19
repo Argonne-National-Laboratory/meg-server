@@ -41,8 +41,11 @@ def create_celery_routes(celery, cfg):
 
     @celery.task(max_retries=cfg.config.celery.remove_key_data.retries)
     def remove_key_data(gcm_iid):
+        # Send request to phone to delete revoked private key
         gcm = GCM(cfg.config.gcm_api_key)
         data = {"action": "revoke"}
+
+        # Check if there were errors and retry if needed
         response = gcm.json_request(registration_ids=[gcm_iid], data=data)
         if 'errors' in response:
             remove_key_data.retry(

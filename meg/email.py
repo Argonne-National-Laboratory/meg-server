@@ -15,10 +15,12 @@ from meg.pgp import get_pgp_key_data, get_user_id_packet
 
 
 def send_revocation_request_email(cfg, keyid, hex, user_email):
+    # Send message using sendgrid api
     client = SendGridClient(cfg.config.sendgrid.api_key)
     message = get_sendgrid_request_message(cfg, keyid, hex, user_email)
     response = client.send(message)
-    # return content, code
+
+    # Return JSON success message (response[1]) and HTTP status (response[0])
     return response[1], response[0]
 
 
