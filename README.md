@@ -16,6 +16,9 @@ Then you can install meg on your server.
 
     ansible-playbook -i prod.inv deploy.yml --extra-vars 'meg_user_password=<meg db pw> megserver_gcm_api_key=<gcm api key> sendgrid_api_key=<sendgrid api secret>'
 
+## General documentation
+[Flowcharts](docs/flowcharts.md)
+
 ## Testing
 Testing is important if you want to ensure that the changes you made to the server
 did not break anything. We are performing all testing through `nose`. First you
