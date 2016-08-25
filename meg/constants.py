@@ -5,6 +5,6 @@ EMAIL_HTML = """
 
 <div>&nbsp;</div>
 
-<div>{link}</div>
+<div><a href=\"{link}\">{link}</a></div>
 """
 HTML_PARSER = "html.parser"
