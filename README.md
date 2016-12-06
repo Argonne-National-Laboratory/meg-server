@@ -17,8 +17,7 @@ install ansible
     ansible-galaxy install -r requirements.yml
 
 ### Setup Ansible Targets
-Change prod.inv targets for your server
-Generate ssh keys and add them to your target server
+Change prod.inv targets for your server. Generate ssh keys and add them to your target server
 
 ### Install MEG
 Replace with your preferred database password, GCM API key, and Sendgrid API key.
