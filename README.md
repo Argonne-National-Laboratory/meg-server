@@ -6,14 +6,22 @@ Installation can be done using ansible. Since megserver is built with python3 bu
 ansible does not support python3 you must create a new virtualenv for python2 and
 install ansible
 
+### Install required dependencies
+    apt-get install build-essential sudo virtualenv postgresql-server-dev-all python-dev python3-dev
+    
+### Setup Ansible in the virtual environment
     virtualenv venv27
     source venv27/bin/activate
-    pip install ansible
+    pip install ansible==2.1.1.0 markupsafe
     cd ansible
     ansible-galaxy install -r requirements.yml
 
-Then you can install meg on your server.
+### Setup Ansible Targets
+Change prod.inv targets for your server
+Generate ssh keys and add them to your target server
 
+### Install MEG
+Replace with your preferred database password, GCM API key, and Sendgrid API key.
     ansible-playbook -i prod.inv deploy.yml --extra-vars 'meg_user_password=<meg db pw> megserver_gcm_api_key=<gcm api key> sendgrid_api_key=<sendgrid api secret>'
 
 ## General documentation
