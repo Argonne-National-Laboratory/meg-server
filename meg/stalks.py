@@ -27,7 +27,7 @@ def create_celery_routes(celery, cfg):
         logger.info("Transmit id: {} to phone with iid: {}".format(id, gcm_iid))
 
         # Get Response
-        response = gcm.json_request(registration_ids=[gcm_iid], data=data)
+        response = gcm.json_request(registration_ids=[gcm_iid], data=data, priority="high")
 
         # Check errors and retry if necessary
         if 'errors' in response:
