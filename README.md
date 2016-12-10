@@ -21,6 +21,7 @@ Change prod.inv targets for your server. Generate ssh keys and add them to your 
 
 ### Install MEG
 Replace with your preferred database password, GCM API key, and Sendgrid API key.
+
     ansible-playbook -i prod.inv deploy.yml --extra-vars 'meg_user_password=<meg db pw> megserver_gcm_api_key=<gcm api key> sendgrid_api_key=<sendgrid api secret>'
 
 ## General documentation
