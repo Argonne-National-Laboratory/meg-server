@@ -7,7 +7,7 @@ ansible does not support python3 you must create a new virtualenv for python2 an
 install ansible
 
 ### Install required dependencies
-    apt-get install build-essential sudo virtualenv postgresql-server-dev-all python-dev python3-dev
+    apt-get install build-essential sudo virtualenv libssl-dev postgresql-server-dev-all python-dev python3-dev
     
 ### Setup Ansible in the virtual environment
     virtualenv venv27
